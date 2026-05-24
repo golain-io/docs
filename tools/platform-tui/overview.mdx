@@ -1,0 +1,75 @@
+---
+title: Platform CLI overview
+description: platform-tui — terminal UI and scriptable CLI for the Golain platform API.
+---
+
+**platform-tui** is the official terminal interface to Golain. It ships from the [ilyama](https://github.com/golain-io/ilyama) repository under `tools/platform-tui/`.
+
+Use it two ways:
+
+| Mode | How | Best for |
+|------|-----|----------|
+| **TUI** | Run `platform-tui` with no subcommand | Interactive browsing, stats, live event stream |
+| **CLI** | `platform-tui <command> [flags]` | Scripts, CI, JSON output |
+
+Both modes share the same credential profiles and org/project **context**.
+
+## Install
+
+→ [Install platform-tui](/tools/platform-tui/install)
+
+## Quick example
+
+```bash
+platform-tui login
+platform-tui context set --org=my-org --project=my-project
+platform-tui fleets list
+platform-tui devices list --fleet=sensors
+platform-tui --output=json devices mqtt-details sensor-01 --fleet=sensors
+```
+
+## Global flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--profile` | `default` | Named credential profile |
+| `--output` | `table` | `table`, `json`, or `jsonl` |
+| `--yes` | `false` | Skip confirmation prompts |
+
+Exit codes: `0` success · `1` error · `2` not found.
+
+## Feature parity with console
+
+| Area | CLI support |
+|------|-------------|
+| Orgs, projects, fleets, devices | Full CRUD |
+| Tags | Full CRUD |
+| OTA releases & deployments | Full CRUD + trigger/cancel |
+| Integrations | List accounts & bindings |
+| Users | List org members |
+| Events | Audit, MQTT, TSDB snapshots + live SSE watch |
+| Edge sync | Lineages, schema reviews, staged/written rows |
+
+## TUI highlights
+
+Interactive screens include **Stats & graphs**, **Event stream**, **Data explorer** (QueryScript), and **Edge sync** governance. See [TUI guide](/tools/platform-tui/tui-guide).
+
+## vs Golain CLI
+
+| | platform-tui | golain-cli |
+|---|--------------|------------|
+| Scope | Full platform API | Devices + SSH focus |
+| Output | table/json/jsonl | Human tables |
+| TUI | Yes | No |
+| SSH to device | No | Yes (`golain ssh`) |
+
+Use both: `platform-tui` for fleet ops, `golain-cli` for field SSH.
+
+<CardGroup cols={2}>
+  <Card title="Login & profiles" icon="key" href="/tools/platform-tui/login">
+    Zitadel device authorization flow.
+  </Card>
+  <Card title="CLI reference" icon="book" href="/tools/platform-tui/cli-reference">
+    All subcommands and examples.
+  </Card>
+</CardGroup>

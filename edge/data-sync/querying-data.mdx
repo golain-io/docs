@@ -1,0 +1,120 @@
+---
+title: Querying synced data
+description: Read materialized mirror rows, telemetry fallbacks, and QueryScript.
+---
+
+After schema approval and materialization, synced SQLite data lives in **mirror tables** or **telemetry** — not in the raw staging ledger.
+
+## Mirror tables (relational)
+
+Physical table naming:
+
+| Coalescing | Pattern | Example |
+|------------|---------|---------|
+| Device-scoped (default) | `edge_mirror_{device8}_{source_table}` | `edge_mirror_a1b2c3d4_device_state` |
+| Project coalesced | `edge_mirror_p{project8}_{table}` | `edge_mirror_p9f8e7d6c_readings` |
+| Fleet coalesced | `edge_mirror_f{fleet8}_{table}` | `edge_mirror_f1a2b3c4d_status` |
+
+`device8` / `project8` / `fleet8` are truncated hex prefixes of UUIDs.
+
+Rows include platform columns (device_id, ingest metadata) plus mirrored source columns you approved with action **`mirror`**.
+
+## HTTP API
+
+```bash
+GET /core/api/v1/projects/{project_id}/edge/lineages/{lineage_id}/mirror-rows?page=1&limit=100
+```
+
+Returns paginated JSON rows from the provisioned mirror for that lineage.
+
+**Staged** (pre-materialization) rows:
+
+```bash
+GET .../lineages/{lineage_id}/staged-rows
+```
+
+Use staged endpoint to debug; use mirror-rows for product queries.
+
+## platform-tui
+
+1. Edge Sync → Lineages → select lineage
+2. Press **`w`** for written data
+3. Toggle **`s`** / **`w`** in data viewport
+
+If mirror-rows returns 404 (mirror not yet provisioned), TUI builds a **QueryScript** fallback against telemetry — see below.
+
+## QueryScript (Data explorer)
+
+Project menu → **Data explorer** posts QueryScript v2 JSON.
+
+Example — filter telemetry written from mapped columns:
+
+```json
+{
+  "version": 2,
+  "from": "telemetry_data_point_value",
+  "select": ["device_id", "ts", "value"],
+  "where": {
+    "and": [
+      { "eq": ["device_id", "YOUR-DEVICE-UUID"] }
+    ]
+  },
+  "limit": 100
+}
+```
+
+Use **device UUID** (from console/`platform-tui devices get`), not MQTT device name, for telemetry filters.
+
+CLI equivalent: run TUI Data explorer or call `POST /projects/{id}/queryscript` via API.
+
+## Choosing mirror vs telemetry
+
+| You approved with | Query surface |
+|-------------------|---------------|
+| `mirror` action | `mirror-rows` API / `edge_mirror_*` table |
+| `map` action | Telemetry / datapoint APIs |
+| Mixed | Both — join in application layer |
+
+## Authz note
+
+Authorized read paths for mirror tables in product UI are **evolving**. Admin operators with project device-manage permission can read via edge API today. Customer-facing dashboards should confirm authz model before exposing mirror data broadly.
+
+## Verification queries (operators with DB access)
+
+On Timescale (internal debugging only):
+
+```sql
+-- Batch ledger
+SELECT received_at, source_table, kind, row_count, status
+FROM edge_export_segments
+WHERE device_id = '...'
+ORDER BY received_at DESC LIMIT 10;
+
+-- Staged bodies
+SELECT source_commit_seq, staging_reason
+FROM edge_staged_rows
+WHERE device_id = '...'
+ORDER BY source_commit_seq;
+
+-- Mirror (after approve)
+SELECT * FROM edge_mirror_a1b2c3d4_device_state
+WHERE device_id = '...'
+LIMIT 20;
+```
+
+Do not expose raw TSDB access to end customers — use API and QueryScript.
+
+## Empty results checklist
+
+| Check | Action |
+|-------|--------|
+| Schema review still `queued`? | [Approve](/edge/data-sync/schema-review-workflow) |
+| Lineage `paused` for backpressure? | [Backpressure](/edge/data-sync/backpressure) |
+| Only pre-Omega rows in SQLite? | Trigger new mutations after Omega start |
+| Wrong device UUID in filter? | Use metadata UUID not MQTT name |
+| Column action `ignore` on all fields? | Re-approve with `mirror` actions |
+
+## Related
+
+- [Schema review workflow](/edge/data-sync/schema-review-workflow)
+- [platform-tui TUI guide](/tools/platform-tui/tui-guide)

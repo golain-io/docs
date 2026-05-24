@@ -1,0 +1,139 @@
+---
+title: platform-tui Edge Sync
+description: Operate lineages, schema reviews, and staged vs written data in the TUI.
+---
+
+**Edge Sync** in platform-tui is the primary operator UI for SQLite replication governance when you prefer a terminal over raw HTTP.
+
+## Access
+
+```bash
+platform-tui login
+platform-tui context set --org=my-org --project=my-project
+platform-tui    # no subcommand → TUI
+```
+
+Navigate: **Project menu → Edge Sync**
+
+## Menu structure
+
+```
+Edge Sync
+├── Lineages
+│   ├── List (paginated)
+│   └── Detail → staged/written data
+└── Schema Reviews
+    ├── List (filter by status)
+    └── Detail → claim / approve / reject
+```
+
+Global TUI keys: `↑/↓` navigate, `Enter` select, `Esc` back, `/` filter, `r` refresh, `q` quit.
+
+## Lineages list
+
+Shows per `(device, source_table)`:
+
+- Lineage ID
+- Status: `active` or `paused`
+- Device reference
+- Source table name
+
+Select a row for **lineage detail**.
+
+## Lineage detail
+
+Displays:
+
+- Ingestion status and pause reason hints
+- **Materialization** section — failure count, last error (circuit breaker)
+- Schema version history summary
+- Column bindings (when approved)
+- Replay intent status
+- Registry / coalesced mirror info (when applicable)
+
+### Keybindings
+
+| Key | Action |
+|-----|--------|
+| `d` | Open **staged** row data for this lineage |
+| `w` | Open **written** (materialized mirror) data |
+| `x` | **Reset materialization** — only when materialization error present |
+| `D` | **Delete lineage** (confirmation prompt) |
+| `r` | Refresh detail |
+
+<Warning>
+  **`x` reset** clears materialization circuit breaker — not volume backpressure pause. See [backpressure](/edge/data-sync/backpressure).
+</Warning>
+
+## Staged / written data view
+
+Shared viewport for inspecting row payloads.
+
+| Key | Action |
+|-----|--------|
+| `s` | Switch to **staged** rows |
+| `w` | Switch to **written** rows |
+| `n` / `p` | Next / previous page (mirror-rows API pagination) |
+| Scroll | `↑/↓` when viewport focused |
+
+**Staged** reads `GET .../lineages/{id}/staged-rows`.
+
+**Written** reads `GET .../lineages/{id}/mirror-rows`. If mirror not provisioned (404), TUI falls back to QueryScript against `telemetry_data_point_value` filtered by device — see [querying data](/edge/data-sync/querying-data).
+
+## Schema reviews list
+
+Shows reviews with status:
+
+- `queued` — needs claim
+- `in_review` — operator working
+- `approved` / `rejected` / `abandoned` — terminal
+
+Select for **review detail**.
+
+## Schema review detail
+
+| Key | When | Action |
+|-----|------|--------|
+| `c` | status=`queued` | **Claim** review |
+| `a` | status=`in_review` | **Approve** (dev shortcut — single column) |
+| `x` | status=`in_review` | **Reject** |
+| `d` | any | Staged data for linked lineage |
+| `w` | any | Written data for linked lineage |
+| `r` | any | Refresh |
+
+<Tip>
+  For production approvals with multiple columns, use the [HTTP API](/edge/data-sync/api-reference) with full `column_actions`. TUI **`a`** is a convenience for single-value demo tables.
+</Tip>
+
+## Typical operator session
+
+1. **`r`** on Edge Sync menu — refresh lineages after device deploy.
+2. Open **Schema Reviews** — claim newest `queued`.
+3. **`d`** — confirm staged JSON looks correct.
+4. Approve via API (or **`a`** for trivial tables).
+5. Return to **Lineages** → **`w`** — confirm mirror rows.
+6. **`events watch`** in separate terminal for `materialization_failed` events.
+
+## Not available in TUI yet
+
+Use HTTP API instead:
+
+- Registry schema reviews (`/edge/registry-reviews/*`)
+- Coalesced mirror list and consolidation
+- Project edge policy PATCH (`schema_coalescing_mode`)
+
+## CLI alternatives
+
+List lineages as JSON for scripts:
+
+```bash
+# Requires API exposure or future CLI subcommand — today use curl:
+curl -s -H "Authorization: Bearer $(platform-tui whoami 2>/dev/null)" ...
+```
+
+Edge Sync is TUI-first; governance mutations map 1:1 to [API reference](/edge/data-sync/api-reference) routes.
+
+## Related
+
+- [Schema review workflow](/edge/data-sync/schema-review-workflow)
+- [TUI guide (general)](/tools/platform-tui/tui-guide)

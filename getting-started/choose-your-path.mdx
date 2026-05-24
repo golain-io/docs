@@ -1,0 +1,88 @@
+---
+title: Choose your path
+description: Pick the right entry point — console, CLI, edge client, or self-hosted operator.
+---
+
+Golain spans a cloud platform, web UI, operator CLIs, and on-device software. Use this page to pick the workflow that matches your role.
+
+## Decision guide
+
+```mermaid
+flowchart LR
+  Start([What are you doing?]) --> Web[Manage fleets in browser]
+  Start --> Script[Automate / CI]
+  Start --> Edge[Software on device hardware]
+  Start --> Host[Run platform on my VM]
+  Web --> PW[Web console]
+  Script --> PTUI[platform-tui CLI]
+  Script --> GCLI[golain-cli SSH]
+  Edge --> Omega[Omega edge runtime]
+  Host --> VM[Self-hosted vm-edge]
+```
+
+## Web console (`pw`)
+
+**Best for:** fleet managers, support engineers, day-to-day device operations.
+
+- Visual dashboards, OTA wizards, integration setup
+- Mock mode for local UI development (`VITE_MOCK_AUTH=true`)
+- Requires only a browser and Zitadel login
+
+→ [Console overview](/console/overview) · [Quickstart](/getting-started/quickstart)
+
+## Platform CLI — `platform-tui`
+
+**Best for:** DevOps, SRE, agents, CI pipelines, power users who want JSON output.
+
+- Full CRUD for orgs, projects, fleets, devices, tags, OTA, integrations
+- Interactive **TUI** when run without subcommands
+- Device authorization login; profiles for staging vs production
+
+→ [Platform CLI overview](/tools/platform-tui/overview)
+
+## Golain CLI
+
+**Best for:** operators who need **SSH into devices** through the MQTT bridge.
+
+- `golain login` → `golain set` → `golain devices` → `golain ssh <name>`
+- Focused command set; production endpoints baked in
+
+→ [Golain CLI overview](/tools/golain-cli/overview)
+
+## Omega edge runtime
+
+**Best for:** firmware and edge engineers shipping software onto Linux, macOS, or Windows hardware.
+
+- Profile-driven YAML (`clients/*.yaml`)
+- Modules: shadow, OTA, heartbeat, RPC, SQLite replication, robotics, etc.
+- [JITR](/edge/jitr) for certificate-based enrollment against ilyama
+
+→ [Edge overview](/edge/overview)
+
+## Self-hosted operator
+
+**Best for:** running the full ilyama stack on your own VM with TLS, internal PKI, and Zitadel.
+
+- **vm-edge** bundle: Traefik, Let's Encrypt (Cloudflare DNS-01), data-plane mTLS
+- Distinct from laptop `make dev-infra` (no TLS, local only)
+
+→ [Self-hosted overview](/self-hosted/overview)
+
+## Typical end-to-end flow
+
+1. **Operator** creates org/project/fleet in console or `platform-tui`.
+2. **Edge engineer** builds Omega with `make build-client CLIENT=ilyama-edge`, enrolls via JITR, connects MQTT.
+3. **Support** monitors connectivity in console Event Stream or `platform-tui events watch`.
+4. **Release engineer** publishes OTA release, creates deployment, triggers rollout.
+5. **Field tech** uses `golain ssh` for interactive shell when RPC/SSH module is enabled on device.
+
+## Local development vs production
+
+| Concern | Local (`ilyama`) | Production / VM |
+|---------|------------------|-----------------|
+| Infra | `make dev-provision` (Docker) | vm-edge compose stacks |
+| Auth | `AUTH_BYPASS` or dev Zitadel | Real Zitadel + TLS |
+| Web UI | `npm run dev` + mock server | Built Docker image + nginx |
+| Edge | Omega + `-client clients/ilyama-edge.yaml` | Client-specific binary + JITR |
+
+→ [Local development](/self-hosted/local-development)

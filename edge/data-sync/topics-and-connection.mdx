@@ -1,0 +1,114 @@
+---
+title: Topics and connection
+description: MQTT topic layout, transport, authentication, and subscriptions for edge sync.
+---
+
+Integrators and operators configuring brokers or custom edge agents should use this reference. Normative source: [ilyama edge-client-guide](https://github.com/golain-io/ilyama/blob/main/docs/knowledge/edge-client-guide.md).
+
+## Transport
+
+| Mode | When |
+|------|------|
+| **MQTT over QUIC** | Preferred — low-latency reconnect, no HOL blocking across tables |
+| **MQTT over TLS (TCP)** | `ssl://host:8883` — widely deployed (vm-edge default) |
+
+Omega supports both via `OMEGA_MQTT_BROKER_URL`.
+
+## Authentication
+
+- **mTLS** (recommended): client cert issued by Golain cert worker or JITR
+- **Username/password**: from device MQTT details in console
+
+Broker resolves **`org_id`**, **`project_id`**, **`fleet_id`**, **`device_id`** from session — client must **never** send these as trusted JSON fields.
+
+## Clean session
+
+Set **`clean_session: false`** (persistent session). Required so broker can deliver QoS 1 **downlink** controls while device was offline.
+
+Omega `ilyama-edge` client:
+
+```yaml
+mqtt:
+  clean_session: false
+```
+
+## Topic prefix
+
+All sync topics under project-scoped prefix:
+
+```
+<topic_slug>/<device_name>/sync/...
+```
+
+- **`topic_slug`**: project `TopicSlug` when configured
+- **`device_name`**: registered device name (MQTT client id)
+
+Without slug:
+
+```
+/<device_name>/sync/...
+```
+
+(Leading slash, empty slug segment.)
+
+Set via `OMEGA_ROOT_TOPIC` in Omega.
+
+### Example
+
+Project slug `acme-prod`, device `gw-07`:
+
+```
+acme-prod/gw-07/sync/rows/batch
+acme-prod/gw-07/sync/ingest/control
+```
+
+## Topic table
+
+| Relative path | Direction | Purpose |
+|---------------|-----------|---------|
+| `sync/telemetry/batch` | device → cloud | Timeseries batches |
+| `sync/rows/batch` | device → cloud | Row journal batches |
+| `sync/schema/observe` | device → cloud | Advisory schema fingerprint |
+| `sync/ingest/ack` | device → cloud | ACK for downlink control |
+| `sync/ingest/request` | device → cloud | Presigned URL request / finalize |
+| `sync/ingest/control` | **cloud → device** | pause / resume / url_grant |
+
+**ACL:** Device **cannot publish** to `sync/ingest/control`. Device **must subscribe** to it at QoS 1 immediately after connect.
+
+## QoS and delivery
+
+- Device publishes: **QoS 1**
+- Server downlink: **QoS 1**
+- At-least-once delivery — dedup on server (batch_id or per-row keys)
+
+Safe to retry same `batch_id` on MQTT redelivery.
+
+## Broker → worker routing
+
+mqtt-broker hook publishes to AMQP `telemetry_ingress_exchange`:
+
+| Topic pattern | Event |
+|---------------|-------|
+| `sync/rows/batch`, `sync/telemetry/batch` | `telemetry.edge_export_segment.received.v1` |
+| `sync/schema/observe` | `telemetry.edge_schema_observation.received.v1` |
+| `sync/ingest/ack` | `telemetry.edge_ingest_ack.received.v1` |
+| `sync/ingest/request` | `telemetry.edge_ingest_request.received.v1` |
+
+Worker queue: `QueueEdgeReplicationIngest`.
+
+Downlink: worker stages `integration.edge_ingest_control.requested.v1` → broker publishes to device's `sync/ingest/control`.
+
+## Startup checklist (device)
+
+1. Connect MQTT with persistent session + mTLS.
+2. Subscribe `{prefix}/sync/ingest/control` QoS 1.
+3. Load durable state: `batch_seq`, `commit_seq`, `journal_epoch`, schema hashes, pause watermarks.
+4. Detect schema drift; optional `sync/schema/observe`.
+5. Resume draining backpressure buffer if paused.
+6. Start flush loop (5s / 512 KiB).
+
+## Related
+
+- [Payload formats](/edge/data-sync/payload-formats)
+- [Downlink control](/edge/data-sync/downlink-control)
+- [Omega setup](/edge/data-sync/omega-setup)

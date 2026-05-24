@@ -1,0 +1,169 @@
+---
+title: Payload formats
+description: JSON schemas for row batches, telemetry, schema observation, and ingest messages.
+---
+
+All MQTT payloads: **UTF-8 JSON**, uncompressed on the wire.
+
+## Row batch — `sync/rows/batch`
+
+Primary path for Omega today.
+
+```json
+{
+  "format_version": 1,
+  "capture_strategy": "sqlite_row_batch_v1",
+  "batch_id": "019693e0-...",
+  "journal_epoch": "019693d0-...",
+  "source_table": "device_state",
+  "schema_hash": "a3f9c2...64-hex",
+  "schema_columns": {
+    "table_name": "device_state",
+    "columns": [
+      { "name": "id", "decl_type_affinity": "INTEGER", "pk_ordinal": 1, "not_null": true }
+    ]
+  },
+  "first_commit_seq": 101,
+  "last_commit_seq": 103,
+  "rows": [
+    {
+      "commit_seq": 101,
+      "op": "update",
+      "pk": { "id": 1 },
+      "row": { "id": 1, "mode": "cooling", "setpoint": 21 }
+    },
+    {
+      "commit_seq": 103,
+      "op": "delete",
+      "pk": { "id": 1 },
+      "row": null
+    }
+  ]
+}
+```
+
+| Field | Rules |
+|-------|-------|
+| `batch_id` | UUIDv7 — dedup key with device_id |
+| `journal_epoch` | UUIDv7 — new epoch on journal reinit |
+| `first_commit_seq` / `last_commit_seq` | Min/max of `rows[*].commit_seq` |
+| `schema_columns` | Optional; often on first batch for table |
+| `row` | `null` for `delete` |
+
+**Dedup:** per row `(device_id, source_table, journal_epoch, source_pk_hash, commit_seq)`.
+
+## Telemetry batch — `sync/telemetry/batch`
+
+```json
+{
+  "format_version": 1,
+  "capture_strategy": "sqlite_telemetry_batch_v1",
+  "batch_id": "019693e0-...",
+  "batch_seq": 42,
+  "source_table": "temps",
+  "schema_hash": "a3f9...",
+  "cursor_start_ts": "2026-04-28T09:00:00Z",
+  "cursor_end_ts": "2026-04-28T09:00:10Z",
+  "row_count": 2,
+  "rows": [
+    {
+      "ts": "2026-04-28T09:00:01Z",
+      "row_id": "019693...",
+      "fields": { "value_c": 22.1 }
+    }
+  ]
+}
+```
+
+| Validation | Rejection code |
+|------------|----------------|
+| `row_count` ≠ len(rows) | `row_count_mismatch` |
+| len(rows) > 4096 | `batch_too_many_rows` |
+| cursor timestamps ≠ min/max row ts | `cursor_timestamp_mismatch` |
+| NaN/Inf in numbers | `invalid_number_encoding` |
+
+**Dedup:** `(device_id, batch_id)`. **`batch_seq`** monotonic per table — stale/duplicate seq rejected.
+
+Omega telemetry publish: **not fully implemented** — use row batches meanwhile.
+
+## Schema observation — `sync/schema/observe`
+
+```json
+{
+  "format_version": 1,
+  "source_table": "device_state",
+  "schema_hash": "a3f9...",
+  "observed_at": "2026-04-28T09:00:00.000000000Z"
+}
+```
+
+Advisory only — classification triggered by data batch with unseen hash.
+
+## Ingest ACK — `sync/ingest/ack`
+
+Required response to **every** downlink control:
+
+```json
+{
+  "format_version": 1,
+  "control_id": "server-assigned-uuid"
+}
+```
+
+## Ingest request — `sync/ingest/request`
+
+**URL request:**
+
+```json
+{
+  "format_version": 1,
+  "request_kind": "url_request",
+  "source_table": "device_state"
+}
+```
+
+**Finalize** (after PUT to presigned URL):
+
+```json
+{
+  "format_version": 1,
+  "request_kind": "finalize",
+  "source_table": "device_state",
+  "batch_id": "019693...",
+  "segment_kind": "bootstrap_snapshot"
+}
+```
+
+`segment_kind`: `bootstrap_snapshot` | `payload_spill`
+
+## Schema fingerprint (hash input)
+
+Canonical JSON before SHA-256:
+
+```json
+{
+  "table_name": "temps",
+  "columns": [
+    { "name": "id", "decl_type_affinity": "INTEGER", "pk_ordinal": 1, "not_null": true },
+    { "name": "ts", "decl_type_affinity": "TEXT", "pk_ordinal": 0, "not_null": true },
+    { "name": "value", "decl_type_affinity": "REAL", "pk_ordinal": 0, "not_null": false }
+  ]
+}
+```
+
+Columns sorted by **`name`**. Affinity from SQLite rules. Hash = lowercase hex SHA-256 of canonical JSON.
+
+→ [Schema governance](/edge/data-sync/schema-governance)
+
+## Forbidden payload fields
+
+Do **not** include in device JSON (broker strips or rejects):
+
+- `device_id`, `org_id`, `project_id`, `fleet_id`
+
+Tenant scope comes from MQTT session only.
+
+## Related
+
+- [Downlink control](/edge/data-sync/downlink-control)
+- [Limits, dedup, errors](/edge/data-sync/limits-dedup-errors)

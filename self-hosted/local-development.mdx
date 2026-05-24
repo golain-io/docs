@@ -1,0 +1,91 @@
+---
+title: Local development
+description: Bring up ilyama and pw on a developer laptop with Docker.
+---
+
+For feature development on **ilyama** (API/workers) and **pw** (web console), use the local Docker stack — not the VM edge TLS bundle.
+
+## Prerequisites
+
+- **Go 1.25+**
+- **Docker** with Compose v2
+- **Node.js** (for pw)
+
+## Platform backend (ilyama)
+
+From repo root:
+
+```bash
+make help              # discover targets
+make dev-setup         # infra + migrations + topology + sqlc
+```
+
+`make dev-provision` alone skips sqlc generation.
+
+Per-service env:
+
+```bash
+make service-local-env   # copies missing .env from .env.example
+# or manually: cp services/apis/.env.example services/apis/.env
+```
+
+Run services:
+
+```bash
+make run               # apis, domain-workers, telemetry, mqtt-broker
+make status
+make tail-logs
+```
+
+Ports and troubleshooting: [ilyama getting-started](https://github.com/golain-io/ilyama/blob/main/docs/knowledge/getting-started.md).
+
+### Auth bypass (optional)
+
+With `AUTH_BYPASS=true` in apis `.env`, any bearer token works for API calls — useful for `platform-tui` and e2e without Zitadel.
+
+```bash
+PLATFORM_TOKEN=dev PLATFORM_API_URL=http://localhost:19090 platform-tui fleets list
+```
+
+## Web console (pw)
+
+```bash
+cd pw
+npm install
+cp .env.example .env     # VITE_MOCK_AUTH=true
+npm run mock:server        # :8899
+npm run dev                # :5173
+```
+
+Open `http://localhost:5173` — auto login as Dev User with mock fleets/devices.
+
+Point at real local API by setting `VITE_MOCK_AUTH=false` and configuring Zitadel + `VITE_API_URL`.
+
+## platform-tui from source
+
+```bash
+cd ilyama
+make platform-tui-build
+make platform-tui-login
+make platform-tui
+```
+
+## Omega against local stack
+
+Use HTTP mock transport or local MQTT from `make provision-mqtt-dev`. For full JITR rehearsal, see vm-edge or e2e fixtures.
+
+## When to switch to vm-edge
+
+Move to [VM edge deployment](/self-hosted/vm-edge) when you need:
+
+- Public DNS and Let's Encrypt
+- mTLS on Postgres/Rabbit/Timescale
+- Staging environment matching production topology
+
+## E2E tests
+
+```bash
+make e2e SUITE=smoke
+```
+
+Requires full dev-provision. See [ilyama testing docs](https://github.com/golain-io/ilyama/blob/main/docs/knowledge/testing.md).

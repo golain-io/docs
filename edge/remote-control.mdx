@@ -1,0 +1,73 @@
+---
+title: Remote control
+description: Shadow, heartbeat, OTA, RPC, SSH, and RTC control from the cloud.
+---
+
+The cloud sends **signed control messages** to Omega modules over MQTT. Each module exposes `control` topics for inbound commands and `report` topics for responses.
+
+## Control envelope
+
+When `signed_control.enabled: true` (recommended for production):
+
+```json
+{
+  "token": "your-auth-token",
+  "action": "command-name",
+  "value": "simple-text",
+  "data": { "structured": "payload" },
+  "timestamp": "2026-03-21T12:00:00Z",
+  "nonce": "random-hex",
+  "signature": "hmac-sha256-hex"
+}
+```
+
+Modules reject unsigned or oversized payloads per `security.max_payload_bytes`.
+
+## Heartbeat
+
+**Ping:** `{root}/heartbeat/control/ping`
+
+Reports CPU, memory, uptime on `{root}/heartbeat/report/status`. Drives **online** status in the Golain console.
+
+## Device shadow
+
+**Read:** `{root}/device-shadow/control/read`
+
+**Update:** `{root}/device-shadow/control/update` with JSON state in `data`.
+
+Use shadow for desired vs reported configuration sync.
+
+## RPC
+
+**Execute:** `{root}/reflection/control/request` with `value: "exec:<command>"`
+
+Commands must appear in `security.rpc.allowed_commands`. Response on `{root}/reflection/report/response`.
+
+Platform and console integrations use this path for automated remediation scripts.
+
+## SSH bridge
+
+Session-based shell access for [golain-cli](/tools/golain-cli/commands) `golain ssh`. Requires:
+
+- `ssh-bridge` module in client YAML
+- `rpc` capability and allowlisted commands
+- Device online on MQTT
+
+## OTA
+
+OTA module receives deployment notifications from the platform when you [trigger a deployment](/console/ota). Downloads artifacts, verifies signatures, applies update per profile policy.
+
+## RTC (real-time)
+
+Robotics and AV clients enable the `rtc` module for WebRTC/LiveKit sessions. Configure LiveKit credentials via module block in YAML.
+
+## Operator tools
+
+| Task | Tool |
+|------|------|
+| Trigger OTA | Console or `platform-tui ota deployments trigger` |
+| SSH shell | `golain ssh <device>` |
+| Live events | `platform-tui events watch --device=<uuid>` |
+| Query telemetry | Console dashboards or platform-tui Data explorer |
+
+Full wire-level API listing: [omega/docs/usage.md](https://github.com/golain-io/omega/blob/main/docs/usage.md)

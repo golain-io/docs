@@ -1,0 +1,55 @@
+---
+title: Golain CLI overview
+description: Command-line SSH and device access for field operators.
+---
+
+**golain-cli** is a focused CLI for operators who need quick **device list** and **SSH access** through Golain's MQTT bridge. It lives in [golain-io/golain-cli](https://github.com/golain-io/golain-cli).
+
+## When to use it
+
+| Use golain-cli | Use platform-tui instead |
+|----------------|--------------------------|
+| SSH into a named device | Full fleet CRUD, OTA, integrations |
+| Quick device status check | JSON/CI automation |
+| Field technician laptop | TUI data explorer, edge sync |
+
+## Typical session
+
+```bash
+golain login
+golain set --org-id=YOUR_ORG --project-id=YOUR_PROJECT --fleet-id=YOUR_FLEET
+golain devices
+golain ssh "sensor-01"
+```
+
+## Commands at a glance
+
+| Command | Purpose |
+|---------|---------|
+| `golain login` | OAuth2 browser login (Zitadel) |
+| `golain set` | Default org, project, fleet IDs |
+| `golain devices` | List fleet devices with status |
+| `golain device <name>` | Device detail and monitoring |
+| `golain ssh <name>` | Interactive shell via MQTT bridge |
+| `golain config` | Show saved configuration |
+
+Global flag: `-c, --config` for alternate config file path.
+
+## Requirements on device
+
+SSH requires Omega (or compatible edge client) with:
+
+- **RPC** and **SSH** modules enabled
+- `security.capabilities` allowing remote shell
+- Device online and authenticated to MQTT
+
+Configure edge capabilities in [Omega configure](/edge/configure).
+
+<CardGroup cols={2}>
+  <Card title="Install" icon="download" href="/tools/golain-cli/install">
+    Build and install golain-cli.
+  </Card>
+  <Card title="Commands" icon="terminal" href="/tools/golain-cli/commands">
+    Full command reference.
+  </Card>
+</CardGroup>

@@ -1,0 +1,119 @@
+---
+title: Configure Omega
+description: Client YAML — modules, security, connection, and environment variables.
+---
+
+Omega is configured with a **client YAML** file under `clients/`. Production builds embed this file; development loads it via `-client path/to.yaml`.
+
+## Quick start
+
+```bash
+cp clients/_template.yaml clients/my-device.yaml
+export OMEGA_AUTH_TOKEN=my-secret
+make validate-client CLIENT=my-device
+```
+
+## Top-level fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `name` | Yes | Deployment identifier |
+| `description` | No | Human-readable label |
+| `platform` | Yes | `linux`, `darwin`, or `windows` |
+| `modules` | Yes | Required and optional module lists |
+| `security` | Yes | Auth, signing, capabilities, quotas |
+| `connection` | Yes (prod) | MQTT/HTTP settings — see [Connect](/edge/connect) |
+
+## Example minimal config
+
+```yaml
+name: my-device
+platform: linux
+
+modules:
+  required:
+    - shadow
+    - heartbeat
+    - registration
+    - rpc
+  optional:
+    - ota
+
+security:
+  auth_token_env: OMEGA_AUTH_TOKEN
+  max_payload_bytes: 4096
+  signed_control:
+    enabled: true
+    allow_legacy_token: false
+  capabilities:
+    shadow: true
+    heartbeat: true
+    rpc: true
+    ota: true
+  rpc:
+    allowed_commands:
+      - pwd
+      - hostname
+      - uptime
+```
+
+## Modules
+
+**Required** modules must load or the runtime exits. **Optional** modules are skipped if unavailable.
+
+Common modules:
+
+| Module | Purpose |
+|--------|---------|
+| `shadow` | Device state sync |
+| `heartbeat` | Health telemetry |
+| `registration` | Cloud registration |
+| `ota` | Firmware updates |
+| `rpc` | Remote commands |
+| `ssh-bridge` | Shell access (used with [golain-cli](/tools/golain-cli/overview)) |
+| `rtc` | Real-time streaming (LiveKit) |
+| SQLite replication | Edge table sync — see [Data sync](/edge/data-sync/overview) |
+
+Run `make codegen CLIENT=name` to validate module names and dependencies.
+
+## Security
+
+```yaml
+security:
+  auth_token_env: OMEGA_AUTH_TOKEN    # env var name, not the secret value
+  signed_control:
+    enabled: true
+  capabilities:                        # explicit allow per module
+    shadow: true
+    rpc: true
+  rpc:
+    allowed_commands:                    # shared by rpc + ssh-bridge
+      - uptime
+  max_payload_bytes: 4096
+  max_storage_bytes: 131072
+  expose_sensitive_telemetry: false
+```
+
+<Warning>
+  Never commit secrets into YAML. Reference environment variable **names** only.
+</Warning>
+
+## Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `OMEGA_AUTH_TOKEN` | Shared secret for control message auth |
+| `OMEGA_DEVICE_ID` | Device identity for MQTT topics |
+| `OMEGA_MQTT_USERNAME` / `OMEGA_MQTT_PASSWORD` | Broker credentials |
+| `OMEGA_SIGNING_KEY` | Optional separate HMAC key |
+
+Module-specific vars (LiveKit, D-Bus, ROS) are documented in the Omega repo per module block.
+
+## Development vs production
+
+| Mode | Command | Config source |
+|------|---------|---------------|
+| Dev | `make run CLIENT=canebot` | File on disk |
+| Prod | `make build-client CLIENT=canebot` | Embedded in binary |
+
+→ [Connect to Golain](/edge/connect) · [JITR](/edge/jitr)

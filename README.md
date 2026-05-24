@@ -1,55 +1,56 @@
-# Mintlify Starter Kit
+# Golain documentation
 
-Use the starter kit to get your docs deployed and ready to customize.
+End-user documentation for the Golain IoT platform, built with [Mintlify](https://mintlify.com).
 
-Click the green **Use this template** button at the top of this repo to copy the Mintlify starter kit. The starter kit contains examples with
+**Repository:** [golain-io/docs](https://github.com/golain-io/docs)
 
-- Guide pages
-- Navigation
-- Customizations
-- API reference pages
-- Use of popular components
+## Scope
 
-**[Follow the full quickstart guide](https://starter.mintlify.com/quickstart)**
+| Tab | Covers |
+|-----|--------|
+| **Platform** | Getting started, web console (`pw`) |
+| **Tools** | `platform-tui` CLI/TUI, `golain-cli` |
+| **Edge** | Omega runtime, JITR, deployment, SQLite sync |
+| **Self-hosted** | vm-edge operator stack, local dev |
 
-## AI-assisted writing
+Product repositories:
 
-Set up your AI coding tool to work with Mintlify:
+- [ilyama](https://github.com/golain-io/ilyama) — API, workers, MQTT broker
+- [pw](https://github.com/golain-io/pw) — web console
+- [omega](https://github.com/golain-io/omega) — edge client
+
+## Local preview
+
+```bash
+npm i -g mint
+mint dev
+```
+
+Open `http://localhost:3000`.
+
+```bash
+mint broken-links
+```
+
+## Publishing
+
+Connect the Mintlify GitHub app in the [dashboard](https://dashboard.mintlify.com) to deploy on push to `main`.
+
+## AI-assisted editing
 
 ```bash
 npx skills add https://mintlify.com/docs
 ```
 
-This command installs Mintlify's documentation skill for your configured AI tools like Claude Code, Cursor, Windsurf, and others. The skill includes component reference, writing standards, and workflow guidance.
+For agent instructions see [AGENTS.md](./AGENTS.md).
 
-See the [AI tools guides](/ai-tools) for tool-specific setup.
+Mintlify **admin MCP** (write access) is configured in Cursor via `mintlify-admin` in `~/.cursor/mcp.json`. Credentials are stored locally in `~/secured/mintlify-mcp.env` — not in this repo.
 
-## Development
+## Contributing
 
-Install the [Mintlify CLI](https://www.npmjs.com/package/mint) to preview your documentation changes locally. To install, use the following command:
+1. Branch from `main`
+2. Edit MDX under the appropriate section
+3. Update `docs.json` when adding or renaming pages
+4. Run `mint broken-links` before opening a PR
 
-```
-npm i -g mint
-```
-
-Run the following command at the root of your documentation, where your `docs.json` is located:
-
-```
-mint dev
-```
-
-View your local preview at `http://localhost:3000`.
-
-## Publishing changes
-
-Install our GitHub app from your [dashboard](https://dashboard.mintlify.com/settings/organization/github-app) to propagate changes from your repo to your deployment. Changes are deployed to production automatically after pushing to the default branch.
-
-## Need help?
-
-### Troubleshooting
-
-- If your dev environment isn't running: Run `mint update` to ensure you have the most recent version of the CLI.
-- If a page loads as a 404: Make sure you are running in a folder with a valid `docs.json`.
-
-### Resources
-- [Mintlify documentation](https://mintlify.com/docs)
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for Mintlify starter-kit conventions.

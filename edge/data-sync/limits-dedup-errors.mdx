@@ -1,0 +1,103 @@
+---
+title: Limits, deduplication, and errors
+description: Batch size caps, dedup keys, rejection codes, and client retry behavior.
+---
+
+## Size and rate limits
+
+| Limit | Value |
+|-------|-------|
+| Max MQTT batch payload | **512 KiB** uncompressed JSON |
+| Max rows per batch | **4,096** |
+| Flush interval | **5 seconds** or 512 KiB, whichever first |
+| Max snapshot / spill object | **1 GiB** (zstd JSONL) |
+| Presigned URL TTL | **15 minutes** |
+| Default staged backlog cap | **100,000 rows** / **1 GiB** per lineage |
+| Resume threshold | **80%** of backlog caps |
+
+Exceeding MQTT size → split batches or use secondary spill flow (when implemented).
+
+## Deduplication
+
+### Telemetry batches
+
+| Key | Behavior |
+|-----|----------|
+| `(device_id, batch_id)` | Idempotent retry — same batch_id safe |
+| `batch_seq` | Must increase monotonically per `(device_id, source_table)` |
+
+| Scenario | Result |
+|----------|--------|
+| Same batch_id + batch_seq already accepted | ACK success (no-op) |
+| New batch_id, duplicate batch_seq | `duplicate_batch_seq` — drop batch |
+| New batch_id, lower batch_seq | `stale_batch_seq` — drop batch |
+
+Persist `batch_seq` across restarts unless journal reinitialized (then new `journal_epoch` for rows).
+
+### Row batches
+
+Per-row dedup (not per-batch):
+
+```
+(device_id, source_table, journal_epoch, source_pk_hash, commit_seq)
+```
+
+Retry entire batch safe — already-seen rows skipped.
+
+`journal_epoch` **must** change when journal truncated/rebuilt.
+
+## Rejection codes (batch level)
+
+| Code | Meaning | Client action |
+|------|---------|---------------|
+| `envelope_unstripped_tenant_fields` | Tenant IDs in payload | Remove fields; fix client |
+| `invalid_format_version` | Missing/zero format_version | Fix payload |
+| `unsupported_format_version` | Future version | Upgrade/downgrade agent |
+| `invalid_batch_id` | Not UUIDv7 | Generate valid batch_id |
+| `batch_too_many_rows` | > 4096 rows | Split batch |
+| `row_count_mismatch` | Telemetry count wrong | Fix row_count |
+| `cursor_timestamp_mismatch` | Telemetry cursors wrong | Fix cursor fields |
+| `invalid_row_id` | Bad optional row_id | Fix or omit row_id |
+| `invalid_number_encoding` | NaN/Inf in JSON numbers | Sanitize floats |
+| `duplicate_batch_seq` | Telemetry seq clash | Drop batch; advance |
+| `stale_batch_seq` | Telemetry seq regression | Drop batch |
+
+Full list: `core/constants/edge_replication.go` in ilyama.
+
+## Error handling summary
+
+| Event | Client action |
+|-------|---------------|
+| Batch rejected (format/validation) | Fix payload — do not retry identical bytes |
+| Batch rejected (seq duplicate/stale) | Drop batch; advance cursor |
+| `pause_lineage` | ACK → buffer → stop publish |
+| `resume_lineage` | ACK → drain buffer in order |
+| `url_grant` | ACK → PUT object → finalize |
+| MQTT QoS 1 redelivery | Retry **same** batch_id |
+| Presigned URL expired | New `url_request` |
+
+## Persistent client state
+
+Must survive restarts:
+
+| State | Purpose |
+|-------|---------|
+| `batch_seq` (telemetry tables) | Monotonic sequencing |
+| `commit_seq` + `journal_epoch` (row tables) | Cursor + dedup epoch |
+| Unacked control IDs | Re-ACK on broker redelivery |
+| Backpressure buffer | Drain after resume |
+| `server_watermark` per paused table | Resume start point |
+| Schema hash per table | Drift detection |
+
+Omega stores in **`state.db`** — configure `OMEGA_STATE_DB_PATH` in production.
+
+## Hash formats
+
+- `schema_hash`: 64-char lowercase hex SHA-256
+- `source_pk_hash`: server-computed from canonical `pk` JSON
+
+## Related
+
+- [Payload formats](/edge/data-sync/payload-formats)
+- [Backpressure](/edge/data-sync/backpressure)
+- [Troubleshooting](/edge/data-sync/troubleshooting)

@@ -1,0 +1,55 @@
+---
+title: Settings
+description: Organization and project settings, members, and environments.
+---
+
+Settings cover org-wide configuration, project metadata, members, and environment variables.
+
+## Organization settings
+
+Available to org **owners** and **admins**:
+
+- Organization profile and billing contacts
+- Member invites and role assignment
+- Org-level tags and policies (where exposed in UI)
+
+List members from CLI:
+
+```bash
+platform-tui users list
+platform-tui users list --permission=admin --output=jsonl
+```
+
+## Project settings
+
+Per-project configuration includes:
+
+- Project name, region, hosting metadata
+- Secrets and environment variables (where enabled)
+- Feature flags visible to the project
+
+Create projects via CLI:
+
+```bash
+platform-tui projects create --name=staging --region=us-east-1 --hosting-platform=aws
+platform-tui projects list
+```
+
+## Authentication settings
+
+Human auth is managed in **Zitadel**, not inside Golain settings screens:
+
+- OIDC clients for console (`pw`) and CLIs must be registered in Zitadel
+- Redirect URIs must match deployed console URLs
+- Device auth uses MQTT credentials or JITR — separate from user OIDC
+
+See [Platform CLI login](/tools/platform-tui/login) for creating a Zitadel **Native / Device Authorization** application for `platform-tui`.
+
+## Self-hosted operators
+
+When you operate your own stack, Zitadel and API URLs come from your vm-edge deployment. Configure service env files documented in [VM edge deployment](/self-hosted/vm-edge).
+
+## Related
+
+- [Platform concepts — permissions](/getting-started/concepts)
+- [Console overview](/console/overview)

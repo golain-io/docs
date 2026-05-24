@@ -1,0 +1,76 @@
+---
+title: Quickstart
+description: Sign in, create a project, and add your first device in minutes.
+---
+
+This walkthrough gets you from zero to a registered device using the **web console**. For CLI or edge-only paths, see [Choose your path](/getting-started/choose-your-path).
+
+## Prerequisites
+
+- A Golain account (invited to an organization, or access to a self-hosted instance)
+- A modern browser (Chrome, Firefox, Safari, or Edge)
+
+## Step 1 — Sign in
+
+1. Open your Golain console URL (cloud: `https://app.golain.io`, or your operator-provided host).
+2. Click **Sign in**. You are redirected to **Zitadel** for OIDC authentication.
+3. Complete login. You land on the organization picker or your last project.
+
+<Note>
+  Local development of the web app (`pw`) can use mock auth — set `VITE_MOCK_AUTH=true` in `.env`. Production and shared environments always use real Zitadel login.
+</Note>
+
+## Step 2 — Select org and project
+
+The console scopes all actions to **one organization** and **one project** at a time.
+
+1. Use the org switcher in the header if you belong to multiple organizations.
+2. Open **Projects** and select a project, or create one with **New project**.
+3. Note the URL pattern: `/{org_id}/{project_id}/…` — bookmarks and deep links include both IDs.
+
+## Step 3 — Create a fleet
+
+Fleets group devices for deployment and access control.
+
+1. Go to **Fleets** in the project sidebar.
+2. Click **Create fleet**.
+3. Enter a name (for example `warehouse-sensors`) and optional description.
+4. Save. You are taken to the fleet detail view.
+
+## Step 4 — Register a device
+
+1. Inside your fleet, open **Devices** → **Add device**.
+2. Enter a device name (for example `sensor-01`) and device type (typically **MQTT**).
+3. Save. The device detail page shows:
+   - Device ID (UUID)
+   - Connection status (offline until the edge client connects)
+   - **MQTT details** — broker host, port, TLS, client ID, topic filters
+
+Copy MQTT credentials before moving to edge setup. You need them when configuring [Omega](/edge/configure) or any MQTT-capable client.
+
+## Step 5 — Connect an edge client (optional)
+
+To see the device come **online**:
+
+1. Install [Omega](/edge/install) on your hardware or a dev machine.
+2. Configure [JITR enrollment](/edge/jitr) or paste MQTT credentials from the console.
+3. Start Omega. Within a few seconds the device status in the console should show **connected**.
+
+## Step 6 — Verify telemetry and events
+
+- **Event stream** — project-level live events (device connect/disconnect, audit actions).
+- **Stats & graphs** — fleet connectivity breakdown.
+- **Data explorer** (platform CLI TUI) — run QueryScript against project telemetry.
+
+For automation without the browser, continue with [Platform CLI](/tools/platform-tui/login).
+
+## Next steps
+
+<CardGroup cols={2}>
+  <Card title="Platform concepts" icon="sitemap" href="/getting-started/concepts">
+    Orgs, projects, fleets, permissions, and API scope.
+  </Card>
+  <Card title="Console guide" icon="desktop" href="/console/overview">
+    Full tour of the web UI modules.
+  </Card>
+</CardGroup>

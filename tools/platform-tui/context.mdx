@@ -1,0 +1,42 @@
+---
+title: Context
+description: Set org and project scope for platform-tui commands.
+---
+
+After login, set a **context** so commands default to the right org and project (similar to `kubectl config use-context`).
+
+```bash
+platform-tui context set --org=my-org --project=my-project
+platform-tui context get
+
+# Clear selectively
+platform-tui context unset --project
+platform-tui context unset --org      # clears org and project
+```
+
+Context is stored in the active profile JSON alongside credentials.
+
+Once set, omit `--org` and `--project` on subcommands:
+
+```bash
+platform-tui fleets list
+platform-tui devices list --fleet=sensors
+```
+
+## Multiple environments
+
+Use named profiles for staging vs production:
+
+```bash
+platform-tui login --profile=prod
+platform-tui login --profile=staging
+
+platform-tui --profile=staging context set --org=lab --project=dev
+platform-tui --profile=prod context set --org=acme --project=production
+```
+
+## TUI behavior
+
+The interactive TUI uses the same profile and context. On launch it lists orgs → projects → project menu.
+
+→ [CLI reference](/tools/platform-tui/cli-reference)

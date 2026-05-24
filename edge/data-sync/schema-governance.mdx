@@ -1,0 +1,140 @@
+---
+title: Schema governance
+description: Fingerprints, classification, reviews, and column binding actions.
+---
+
+Golain does not blindly copy SQLite schemas. Every table's **schema fingerprint** is hashed, **classified**, and — when required — reviewed by an operator before data becomes queryable product storage.
+
+## Schema fingerprint
+
+Before each batch, the edge agent builds canonical JSON from `PRAGMA table_info`:
+
+```json
+{
+  "table_name": "device_state",
+  "columns": [
+    { "name": "id", "decl_type_affinity": "INTEGER", "pk_ordinal": 1, "not_null": true },
+    { "name": "mode", "decl_type_affinity": "TEXT", "pk_ordinal": 0, "not_null": false }
+  ]
+}
+```
+
+Rules:
+
+- Columns sorted **by name** (not table ordinal).
+- Types mapped to SQLite **affinity classes** (`INTEGER`, `TEXT`, `REAL`, `BLOB`, `NUMERIC`).
+- `pk_ordinal`: 0 for non-PK columns; 1..N for composite PK members.
+- Indexes, triggers, FKs, defaults — **excluded** from fingerprint.
+
+**Hash:** canonical JSON (sorted keys, no whitespace) → SHA-256 → lowercase 64-char hex = **`schema_hash`**.
+
+Column reorder does **not** change the hash. Adding/removing columns, changing types, or PK membership **does**.
+
+→ Integrator detail: [Payload formats — schema observation](/edge/data-sync/payload-formats)
+
+## Classification
+
+When a batch arrives with a hash the cloud has not accepted for this lineage:
+
+| Classification | Typical trigger | Default behavior |
+|----------------|-----------------|------------------|
+| `compatible_additive` | New nullable column | May auto-continue if policy allows |
+| `compatible_mapped` | Matches existing bindings | Materialize |
+| `ambiguous` | First schema or unbound columns | Review **queued**, lineage **paused**, rows **staged** |
+| `breaking` | Type change, dropped column, PK change | Review **queued**, lineage **paused** |
+| `unknown` | Parser edge case | Treat as ambiguous |
+
+Production default: **`allow_additive_continue=false`** → first insert to a new table always hits **`ambiguous`**.
+
+## Schema observation (advisory)
+
+Devices may publish `sync/schema/observe` when hash changes:
+
+```json
+{
+  "format_version": 1,
+  "source_table": "device_state",
+  "schema_hash": "a3f9...",
+  "observed_at": "2026-04-28T09:00:00.000000000Z"
+}
+```
+
+Observations **warm** server-side registry metadata. They do **not** replace the need for a data batch to trigger classification.
+
+## Schema review states
+
+| Status | Meaning |
+|--------|---------|
+| `queued` | Awaiting operator claim |
+| `in_review` | Operator claimed; inspecting staged rows |
+| `approved` | Column actions applied; replay scheduled |
+| `rejected` | Schema rejected; lineage stays paused |
+| `abandoned` | Operator abandoned (registry path) |
+
+Permission for claim/approve/reject: **`PROJECT_CAN_MANAGE_DEVICES`**.
+
+## Column actions (approve)
+
+When approving, specify one action per source column:
+
+| Action | Effect |
+|--------|--------|
+| `mirror` | Relational column in `edge_mirror_*` table (`mirror_column_name` optional) |
+| `map` | Map to existing `device_data_point_id` → telemetry path |
+| `ignore` | Drop column from cloud projection |
+| `defer` | Leave unbound — lineage may stay paused if required columns deferred |
+| `auto_create_and_map` | Create datapoint + map (requires project policy `allow_auto_create_device_data_points=true`) |
+
+Example approve body:
+
+```json
+{
+  "action_version": 1,
+  "column_actions": [
+    { "source_column_name": "id", "action": "mirror", "mirror_column_name": "id" },
+    { "source_column_name": "key", "action": "mirror", "mirror_column_name": "key" },
+    { "source_column_name": "value", "action": "mirror", "mirror_column_name": "value" }
+  ]
+}
+```
+
+All mutations require header **`Idempotency-Key`**.
+
+→ Step-by-step: [Schema review workflow](/edge/data-sync/schema-review-workflow)
+
+## What the device does during review
+
+The edge agent **does not wait** for review completion:
+
+1. Keeps publishing batches with the new `schema_hash`.
+2. Cloud **stages** rows while lineage is paused for review.
+3. After approve, cloud **replays** staged rows into mirror.
+
+If the server sends **`pause_lineage`** (backpressure, not review alone), the device must ACK and buffer locally.
+
+→ [Downlink control](/edge/data-sync/downlink-control)
+
+## Schema drift on device
+
+When application migrations alter SQLite DDL:
+
+1. Edge recomputes fingerprint on next flush.
+2. Optional `sync/schema/observe` publish.
+3. Next batch includes new hash → cloud re-classifies.
+
+**Reinstall triggers** after DDL on enrolled tables (Omega does this on module restart).
+
+## Events (audit / automation)
+
+Governance emits integration events (for SSE, workflows):
+
+- `integration.edge_schema_review.queued|approved|rejected|abandoned.v1`
+- `integration.edge_table_lineage.ingestion_paused|ingestion_resumed.v1`
+- `integration.edge_export_segment.materialized|materialization_failed.v1`
+
+Subscribe via project event stream: `platform-tui events watch`.
+
+## Related
+
+- [Registry coalescing](/edge/data-sync/registry-coalescing) — share schema decisions across devices
+- [HTTP API — schema reviews](/edge/data-sync/api-reference)

@@ -1,0 +1,58 @@
+---
+title: JITR enrollment
+description: Just-in-Time Registration — bootstrap certificate to device certificate on Golain.
+---
+
+**Just-in-Time Registration (JITR)** lets Omega enroll with Golain before the first MQTT connection. The platform returns a **device certificate** and **broker URL**; Omega stores them locally and connects with mTLS.
+
+## When to use JITR
+
+| Scenario | Approach |
+|----------|----------|
+| Factory provisioning with bootstrap cert | JITR |
+| Manual device in console + MQTT password | [Connect](/edge/connect) with username/password |
+| Dev laptop against local stack | JITR with vm-edge bootstrap cert or auth bypass |
+
+## Configuration
+
+Enable under `connection.jitr` in client YAML (see `clients/ilyama-edge.yaml`):
+
+| Field | Description |
+|-------|-------------|
+| `api_base_url` | Platform API (for example `https://api.golain.io`) |
+| `bootstrap_cert_path` | Fleet bootstrap PEM from operator |
+| `cert_dir` | Storage for issued `device.crt` / `device.key` |
+| `org_id`, `project_id`, `fleet_id`, `device_name` | Must match console registration |
+
+Environment overrides use `*_env` suffix fields for each value.
+
+## Flow
+
+1. Register device name in [console](/console/fleets-and-devices) or `platform-tui devices create`.
+2. Deploy Omega built with `CLIENT=ilyama-edge` (or custom YAML with JITR block).
+3. On startup Omega calls `POST /core/api/v1/devices/jitr` with bootstrap mTLS.
+4. Platform returns MQTT broker URL and device certificate.
+5. Omega patches `connection.server_url` and connects with issued cert.
+
+## Idempotency
+
+Enrollment sends a stable `Idempotency-Key` derived from `org_id|fleet_id|device_name`. Safe to retry on network failure.
+
+## Example
+
+```bash
+make build-client CLIENT=ilyama-edge GOOS=linux GOARCH=arm64
+export OMEGA_AUTH_TOKEN=...
+# bootstrap cert mounted at path configured in YAML
+./omega-linux-arm64
+```
+
+## Troubleshooting
+
+| Issue | Check |
+|-------|-------|
+| 404 / not found | Device name registered in correct fleet? |
+| Cert rejected | Bootstrap cert matches fleet? Clock skew? |
+| Wrong broker | API base URL points to same stack as console? |
+
+→ [Edge data sync](/edge/data-sync/overview) for SQLite replication after connect

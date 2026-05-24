@@ -1,72 +1,146 @@
 {
   "$schema": "https://mintlify.com/docs.json",
   "theme": "mint",
-  "name": "Mintlify Starter Kit",
+  "name": "Golain",
+  "description": "Documentation for the Golain IoT platform — console, CLI, edge runtime, and self-hosted deployment.",
   "colors": {
     "primary": "#16A34A",
     "light": "#07C983",
     "dark": "#15803D"
   },
   "favicon": "/favicon.svg",
+  "logo": {
+    "light": "/logo/light.svg",
+    "dark": "/logo/dark.svg"
+  },
+  "navbar": {
+    "links": [
+      {
+        "label": "GitHub",
+        "href": "https://github.com/golain-io"
+      }
+    ],
+    "primary": {
+      "type": "button",
+      "label": "Console",
+      "href": "https://app.golain.io"
+    }
+  },
   "navigation": {
     "tabs": [
       {
-        "tab": "Guides",
+        "tab": "Platform",
         "groups": [
           {
             "group": "Getting started",
             "pages": [
               "index",
-              "quickstart",
-              "development"
+              "getting-started/quickstart",
+              "getting-started/concepts",
+              "getting-started/choose-your-path"
             ]
           },
           {
-            "group": "Customization",
+            "group": "Console",
             "pages": [
-              "essentials/settings",
-              "essentials/navigation"
-            ]
-          },
-          {
-            "group": "Writing content",
-            "pages": [
-              "essentials/markdown",
-              "essentials/code",
-              "essentials/images",
-              "essentials/components",
-              "essentials/reusable-snippets"
-            ]
-          },
-          {
-            "group": "Agent ready",
-            "pages": [
-              "agent-ready/prompt",
-              "agent-ready/visibility",
-              "agent-ready/contextual",
-              "ai-tools/cursor",
-              "ai-tools/claude-code",
-              "ai-tools/windsurf"
+              "console/overview",
+              "console/fleets-and-devices",
+              "console/ota",
+              "console/integrations",
+              "console/settings"
             ]
           }
         ]
       },
       {
-        "tab": "API reference",
+        "tab": "Tools",
         "groups": [
           {
-            "group": "API documentation",
+            "group": "Platform CLI (platform-tui)",
             "pages": [
-              "api-reference/introduction"
+              "tools/platform-tui/overview",
+              "tools/platform-tui/install",
+              "tools/platform-tui/login",
+              "tools/platform-tui/context",
+              "tools/platform-tui/cli-reference",
+              "tools/platform-tui/tui-guide"
             ]
           },
           {
-            "group": "Endpoint examples",
+            "group": "Golain CLI",
             "pages": [
-              "api-reference/endpoint/get",
-              "api-reference/endpoint/create",
-              "api-reference/endpoint/delete",
-              "api-reference/endpoint/webhook"
+              "tools/golain-cli/overview",
+              "tools/golain-cli/install",
+              "tools/golain-cli/commands"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Edge",
+        "groups": [
+          {
+            "group": "Omega edge runtime",
+            "pages": [
+              "edge/overview",
+              "edge/install",
+              "edge/configure",
+              "edge/connect",
+              "edge/jitr",
+              "edge/deploy",
+              "edge/remote-control"
+            ]
+          },
+          {
+            "group": "Edge SQLite sync",
+            "pages": [
+              "edge/data-sync/overview",
+              "edge/data-sync/how-it-works",
+              "edge/data-sync/lineages-and-staging",
+              "edge/data-sync/schema-governance",
+              "edge/data-sync/registry-coalescing",
+              "edge/data-sync/backpressure"
+            ]
+          },
+          {
+            "group": "Edge agent (Omega)",
+            "pages": [
+              "edge/data-sync/omega-setup",
+              "edge/data-sync/configuration",
+              "edge/data-sync/capture-strategies",
+              "edge/data-sync/provisioning-checklist"
+            ]
+          },
+          {
+            "group": "Operate & query",
+            "pages": [
+              "edge/data-sync/schema-review-workflow",
+              "edge/data-sync/platform-tui-guide",
+              "edge/data-sync/api-reference",
+              "edge/data-sync/querying-data",
+              "edge/data-sync/troubleshooting"
+            ]
+          },
+          {
+            "group": "Wire protocol reference",
+            "pages": [
+              "edge/data-sync/topics-and-connection",
+              "edge/data-sync/payload-formats",
+              "edge/data-sync/downlink-control",
+              "edge/data-sync/limits-dedup-errors"
+            ]
+          }
+        ]
+      },
+      {
+        "tab": "Self-hosted",
+        "groups": [
+          {
+            "group": "Deployment",
+            "pages": [
+              "self-hosted/overview",
+              "self-hosted/vm-edge",
+              "self-hosted/local-development"
             ]
           }
         ]
@@ -75,52 +149,24 @@
     "global": {
       "anchors": [
         {
-          "anchor": "Documentation",
-          "href": "https://mintlify.com/docs",
-          "icon": "book-open-cover"
+          "anchor": "GitHub",
+          "href": "https://github.com/golain-io/ilyama",
+          "icon": "github"
         },
         {
-          "anchor": "Blog",
-          "href": "https://mintlify.com/blog",
-          "icon": "newspaper"
+          "anchor": "Support",
+          "href": "mailto:support@golain.io",
+          "icon": "envelope"
         }
       ]
     }
   },
-  "logo": {
-    "light": "/logo/light.svg",
-    "dark": "/logo/dark.svg"
-  },
-  "navbar": {
-    "links": [
-      {
-        "label": "Support",
-        "href": "mailto:hi@mintlify.com"
-      }
-    ],
-    "primary": {
-      "type": "button",
-      "label": "Dashboard",
-      "href": "https://dashboard.mintlify.com"
-    }
-  },
   "contextual": {
-    "options": [
-     "copy",
-     "view",
-     "chatgpt",
-     "claude",
-     "perplexity",
-     "mcp",
-     "cursor",
-     "vscode"
-   ]
+    "options": ["copy", "view", "chatgpt", "claude", "cursor", "mcp"]
   },
   "footer": {
     "socials": {
-      "x": "https://x.com/mintlify",
-      "github": "https://github.com/mintlify",
-      "linkedin": "https://linkedin.com/company/mintlify"
+      "github": "https://github.com/golain-io"
     }
   }
 }

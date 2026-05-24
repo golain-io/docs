@@ -1,0 +1,89 @@
+---
+title: Omega edge runtime
+description: Profile-driven edge software for device management, telemetry, and cloud sync.
+---
+
+**Omega** is Golain's edge runtime — a single binary that connects devices to the platform over MQTT (or HTTP for dev). It runs on **Linux**, **macOS**, and **Windows**.
+
+Repository: [golain-io/omega](https://github.com/golain-io/omega)
+
+## Architecture
+
+```
+┌──────────────────────────────────────────────────────────┐
+│ Client YAML (clients/my-device.yaml)                     │
+│  modules: shadow, ota, heartbeat, rpc, sqlite-repl, …   │
+│  security: HMAC control, capability gating               │
+└──────────────────────┬───────────────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────────────┐
+│ Omega runtime                                          │
+│  Module lifecycle · Security · MQTT/HTTP transport      │
+└──────────────────────┬───────────────────────────────────┘
+                       │
+┌──────────────────────▼───────────────────────────────────┐
+│ Golain platform (MQTT broker + API)                      │
+└──────────────────────────────────────────────────────────┘
+```
+
+## Build strategies
+
+**Development** — all modules, load YAML from disk:
+
+```bash
+make build
+./bin/omega-darwin-arm64 -client clients/canebot.yaml
+```
+
+**Production** — minimal client-specific binary:
+
+```bash
+make build-client CLIENT=ilyama-edge GOOS=linux GOARCH=arm64
+```
+
+Client builds embed connection config and include only required modules (~7–20 MB vs ~21 MB omnibus).
+
+## Golain reference client
+
+| Client | Platform | Use case |
+|--------|----------|----------|
+| `ilyama-edge` | Linux | JITR + SQLite replication + MQTT/QUIC |
+| `canebot` | Linux | Robotics data sync |
+| `railway-mitra` | Linux | ROS2 + RTC streaming |
+| `sbfc` | Windows | Device management |
+| `acme-yard` | Linux | Telemetry gateway |
+
+Copy `clients/_template.yaml` to create your own.
+
+## Security model
+
+- Control messages require **HMAC-SHA256** signed envelopes
+- Each module must appear in `security.capabilities`
+- RPC/SSH commands restricted by `security.rpc.allowed_commands`
+- Payload and storage quotas enforced at runtime
+
+## Documentation map
+
+<CardGroup cols={2}>
+  <Card title="Install" icon="download" href="/edge/install">
+    Binaries and cross-compile targets.
+  </Card>
+  <Card title="Configure" icon="sliders" href="/edge/configure">
+    YAML profiles, modules, security.
+  </Card>
+  <Card title="Connect" icon="wifi" href="/edge/connect">
+    MQTT, TLS, topic namespace.
+  </Card>
+  <Card title="JITR enrollment" icon="certificate" href="/edge/jitr">
+    Certificate-based registration with ilyama.
+  </Card>
+  <Card title="Deploy" icon="server" href="/edge/deploy">
+    systemd, launchd, Windows service.
+  </Card>
+  <Card title="Remote control" icon="gamepad" href="/edge/remote-control">
+    Shadow, OTA, RPC, SSH, RTC.
+  </Card>
+  <Card title="SQLite sync" icon="database" href="/edge/data-sync/overview">
+    Edge replication — lineages, schema reviews, mirror tables (full guide).
+  </Card>
+</CardGroup>

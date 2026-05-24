@@ -1,0 +1,62 @@
+---
+title: Self-hosted overview
+description: Run the Golain platform on your own infrastructure.
+---
+
+Golain can run on **Golain-managed cloud** or on **your own VMs** using the open-source [ilyama](https://github.com/golain-io/ilyama) stack.
+
+## Deployment options
+
+| Option | Audience | Entry point |
+|--------|----------|-------------|
+| **Golain cloud** | Most customers | Console at `app.golain.io` — no infra doc required |
+| **Local dev** | Engineers | `make dev-provision` in ilyama |
+| **VM edge (production-like)** | Operators | [VM edge stack](/self-hosted/vm-edge) |
+| **AWS VM bootstrap** | Operators | `ilyama/infra/deploy/aws-vm/README.md` |
+
+## Components
+
+```
+┌─────────────┐     ┌──────────────────┐     ┌─────────────┐
+│  pw (web)   │────▶│  apis + workers  │────▶│  Postgres   │
+└─────────────┘     │  mqtt-broker     │     │  RabbitMQ   │
+                    │  telemetry       │     │  Timescale  │
+                    └────────┬─────────┘     └─────────────┘
+                             │
+                    ┌────────▼─────────┐
+                    │  Omega devices │
+                    └────────────────┘
+```
+
+- **apis** — HTTP API (Fiber)
+- **domain-workers** — mutations, integrations, outbox
+- **mqtt-broker** — device MQTT/QUIC
+- **telemetry** — time-series ingester
+- **Zitadel** — OIDC for users (console + CLIs)
+
+## Choose local dev vs VM edge
+
+| | Local dev | VM edge |
+|---|-----------|---------|
+| TLS on data plane | No | Yes (internal CA) |
+| Public DNS + LE certs | No | Yes (Cloudflare DNS-01) |
+| Command | `make dev-provision` | `make vm-edge-stack-up` |
+| Use case | Laptop feature work | Staging / airgap / on-prem |
+
+→ [Local development](/self-hosted/local-development)
+
+## Edge and console URLs
+
+Self-hosted operators publish:
+
+- `https://auth.<domain>` — Zitadel
+- `https://api.<domain>` — Platform API
+- `https://app.<domain>` — Web console (pw Docker image)
+- `mqtt.<domain>` — Device broker
+
+Configure matching URLs in Omega `connection` / JITR blocks and in pw build args.
+
+## Getting help
+
+- Repo runbooks: `ilyama/infra/devstack/`
+- Mintlify docs (this site): platform, edge, and CLI guides apply to self-hosted with URL substitutions

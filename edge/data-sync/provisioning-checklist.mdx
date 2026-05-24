@@ -1,0 +1,124 @@
+---
+title: Edge sync provisioning checklist
+description: Register device, issue certs, set topics, and validate first sync.
+---
+
+Use this checklist before expecting SQLite replication data in the cloud.
+
+## 1. Register device in Golain
+
+- [ ] Create or select **project** and **fleet**
+- [ ] **Add device** with chosen **name** (e.g. `gw-warehouse-07`)
+- [ ] Note **device name** — this becomes `OMEGA_DEVICE_ID` and MQTT client identity
+- [ ] Note project **topic slug** (if configured) for `OMEGA_ROOT_TOPIC`
+
+```bash
+platform-tui context set --org=... --project=...
+platform-tui devices create --name=gw-warehouse-07 --fleet=sensors --type=mqtt
+platform-tui devices mqtt-details gw-warehouse-07 --fleet=sensors --output=json
+```
+
+## 2. Issue MQTT credentials
+
+Choose one path:
+
+### mTLS certificate (recommended production)
+
+- [ ] Issue device certificate via cert worker / console certificates UI
+- [ ] Save CA, client cert, and key to device filesystem
+- [ ] Set `OMEGA_TLS_*_PATH` env vars
+
+### Username/password
+
+- [ ] Copy MQTT username/password from device MQTT details
+- [ ] Set `OMEGA_MQTT_USERNAME` / `OMEGA_MQTT_PASSWORD`
+
+### JITR bootstrap (ilyama)
+
+- [ ] Obtain fleet **bootstrap certificate**
+- [ ] Configure `connection.jitr` in client YAML
+- [ ] On first run Omega calls JITR API → stores device cert
+
+→ [JITR enrollment](/edge/jitr)
+
+## 3. Configure root topic
+
+Pattern:
+
+```
+{topic_slug}/{device_name}
+```
+
+Examples:
+
+- With slug: `acme-prod/gw-warehouse-07`
+- Without slug: `/gw-warehouse-07` (leading slash, no slug segment)
+
+Set `OMEGA_ROOT_TOPIC` to match broker ACL provisioning.
+
+Sync topics are then:
+
+```
+{root}/sync/rows/batch
+{root}/sync/ingest/control   (subscribe only)
+```
+
+## 4. Prepare SQLite database
+
+- [ ] Application database path known (`OMEGA_SOURCE_DB_PATH`)
+- [ ] Tables have **PRIMARY KEY** defined
+- [ ] Plan for **post-start mutations** (pre-existing rows won't sync without snapshot)
+
+Optional: seed sample DB per [omega sample scripts](https://github.com/golain-io/omega).
+
+## 5. Build and deploy Omega
+
+- [ ] `make build-client CLIENT=ilyama-edge GOOS=... GOARCH=...`
+- [ ] Install binary + systemd unit ([deploy guide](/edge/deploy))
+- [ ] Set all `OMEGA_*` env vars in service unit or env file
+- [ ] `clean_session: false` in embedded connection config
+
+## 6. Verify connectivity
+
+- [ ] Device shows **connected** in console
+- [ ] Heartbeat module reporting (if enabled)
+- [ ] MQTT events in platform-tui:
+
+```bash
+platform-tui events list --source=mqtt --limit=20
+```
+
+## 7. Verify ingest
+
+- [ ] platform-tui → **Edge Sync → Lineages** — one lineage per replicated table
+- [ ] Segment accepted (no permanent reject loop)
+- [ ] Schema review **queued** for new tables (expected)
+
+## 8. Complete governance
+
+- [ ] [Claim and approve schema review](/edge/data-sync/schema-review-workflow)
+- [ ] Staged rows drain after approve
+- [ ] **Written** view shows mirror rows (`w` in TUI)
+
+## 9. Production hardening
+
+- [ ] `signed_control.enabled: true`
+- [ ] TLS verify-full with correct CA
+- [ ] `state.db` on persistent volume
+- [ ] Monitor lineage paused events
+- [ ] Document column actions for each table schema version
+
+## Common misconfigurations
+
+| Mistake | Symptom |
+|---------|---------|
+| `OMEGA_DEVICE_ID` = UUID instead of **name** | ACL/topic mismatch, no ingest |
+| Wrong `OMEGA_ROOT_TOPIC` | Broker accepts connect but rejects publishes |
+| `clean_session: true` | Missed downlink pause/resume while offline |
+| No PRIMARY KEY on table | Table skipped or errors at trigger install |
+| Expecting pre-seeded rows | Empty mirror until new mutations |
+
+## Related
+
+- [Omega setup](/edge/data-sync/omega-setup)
+- [Troubleshooting](/edge/data-sync/troubleshooting)

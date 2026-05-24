@@ -1,0 +1,104 @@
+---
+title: Deploy Omega
+description: Run Omega as systemd, launchd, or Windows service in production.
+---
+
+Production deployments use **client-specific binaries** — connection and modules are embedded at build time. Only secrets and device identity come from environment variables.
+
+## Build for target
+
+```bash
+make build-client CLIENT=ilyama-edge GOOS=linux GOARCH=arm64
+# → bin/omega-linux-arm64
+```
+
+Copy the binary to the device. No YAML file required on disk.
+
+## Linux (systemd)
+
+```bash
+sudo cp bin/omega-linux-amd64 /usr/local/bin/omega
+sudo chmod +x /usr/local/bin/omega
+sudo mkdir -p /var/lib/omega /var/tmp/omega
+sudo useradd -r -s /usr/sbin/nologin omega
+sudo chown -R omega:omega /var/lib/omega /var/tmp/omega
+```
+
+Create `/etc/systemd/system/omega.service`:
+
+```ini
+[Unit]
+Description=Omega Edge Runtime
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=omega
+Group=omega
+Environment=OMEGA_DEVICE_ID=device-42
+Environment=OMEGA_AUTH_TOKEN=your-production-secret
+Environment=OMEGA_MQTT_USERNAME=your-mqtt-user
+Environment=OMEGA_MQTT_PASSWORD=your-mqtt-password
+ExecStart=/usr/local/bin/omega
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/omega /var/tmp/omega
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable:
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable omega
+sudo systemctl start omega
+sudo journalctl -u omega -f
+```
+
+## macOS (launchd)
+
+Install binary to `/usr/local/bin/omega`, create `~/Library/LaunchAgents/io.golain.omega.plist` with `EnvironmentVariables` for `OMEGA_*` vars, then:
+
+```bash
+launchctl load ~/Library/LaunchAgents/io.golain.omega.plist
+```
+
+See Omega repo `docs/deployment.md` for full plist template.
+
+## Windows Service
+
+Use `sc create` or NSSM to register `omega.exe` as a service. Set `OMEGA_*` environment variables in the service configuration.
+
+## Docker (single container)
+
+```bash
+docker run -d --name omega \
+  -e OMEGA_DEVICE_ID=device-42 \
+  -e OMEGA_AUTH_TOKEN=secret \
+  -e OMEGA_MQTT_USERNAME=user \
+  -e OMEGA_MQTT_PASSWORD=pass \
+  -v /var/lib/omega:/var/lib/omega \
+  your-registry/omega:tag
+```
+
+Prefer host networking or explicit MQTT DNS when bridging to on-prem brokers.
+
+## Production checklist
+
+- [ ] `signed_control.enabled: true` in embedded client config
+- [ ] TLS/mTLS configured with valid CA trust
+- [ ] `security.capabilities` lists only required modules
+- [ ] `rpc.allowed_commands` minimized
+- [ ] `expose_sensitive_telemetry: false` unless required
+- [ ] Secrets in env vars or secret manager — not in unit files committed to git
+- [ ] Device registered in Golain console before first connect (or JITR bootstrap cert ready)
+
+→ [Remote control](/edge/remote-control)

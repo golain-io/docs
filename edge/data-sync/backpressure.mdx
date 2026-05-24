@@ -1,0 +1,110 @@
+---
+title: Backpressure
+description: Pause and resume lineages when cloud backlog or device buffers grow.
+---
+
+Backpressure prevents unbounded growth of **staged rows** in the cloud and gives devices a signal to **stop sending** when the server cannot keep up.
+
+## Two pause mechanisms
+
+| Mechanism | Trigger | Device downlink? | Device keeps publishing? |
+|-----------|---------|------------------|------------------------|
+| **Schema review pause** | Ambiguous/breaking schema | No | Yes — server stages |
+| **Volume backpressure** | Staged rows exceed cap | **`pause_lineage`** | No — buffer locally |
+| **Materialization circuit breaker** | Repeated mirror write failures | **`pause_lineage`** | No — buffer locally |
+
+Schema review and volume backpressure both set lineage `paused` in Postgres, but only volume/CB paths send MQTT downlink controls.
+
+## Volume thresholds (defaults)
+
+Per lineage, configured in edge replication policy:
+
+| Setting | Default |
+|---------|---------|
+| `max_pending_rows_per_lineage` | 100,000 rows |
+| `max_pending_bytes_per_lineage` | 1 GiB |
+| `resume_threshold_percent` | 80% |
+
+When staged count **or** bytes exceed the max:
+
+1. Insert `edge_pending_controls` row (`pause_lineage`).
+2. Set lineage **`paused`**.
+3. Publish `integration.edge_ingest_control.requested.v1` → broker delivers `sync/ingest/control`.
+4. Device ACKs, stops publishing that **source_table**, buffers durably.
+
+When both metrics fall **below 80%** of caps, `sweepBackpressureResume`:
+
+1. Sets lineage **`active`**.
+2. Sends **`resume_lineage`** downlink with `server_watermark`.
+
+## Device protocol
+
+### On `pause_lineage`
+
+```
+1. ACK immediately on sync/ingest/ack
+2. Stop publishing batches for source_table
+3. Buffer new journal rows locally (state.db + durable queue)
+4. Record server_watermark from control message
+```
+
+### On `resume_lineage`
+
+```
+1. ACK immediately
+2. Drain buffer in commit_seq order starting at server_watermark + 1
+3. Resume normal 5s flush loop
+```
+
+If local buffer exceeded retention during pause, request **bootstrap snapshot** via secondary flow (when implemented) before resuming incremental sync.
+
+→ [Downlink control](/edge/data-sync/downlink-control)
+
+## Lineage-scoped pause
+
+Pause affects **one SQLite table** on **one device**. Other tables on the same device continue syncing.
+
+Example: `device_state` paused for backpressure; `order_events` still publishes.
+
+## Materialization circuit breaker
+
+Separate from volume caps:
+
+- After **5 permanent** materialization errors, lineage pauses and device receives **`pause_lineage`**.
+- Operator inspects materialization error on lineage detail.
+- Fix binding/DDL/TSDB issue.
+- Call `POST .../lineages/{id}/reset-materialization` to clear counter and optionally trigger **`resume_lineage`**.
+
+platform-tui: lineage detail → **`x`** when materialization error section is present.
+
+<Warning>
+  TUI **`x`** reset applies to **materialization circuit breaker**, not volume backpressure. For volume pause, wait for auto-resume sweep or reduce staged backlog operationally.
+</Warning>
+
+## Monitoring
+
+| Signal | Where |
+|--------|-------|
+| Lineage `paused` + no open review | Likely backpressure or CB |
+| `edge_pending_controls` open rows | Pending downlink / unacked control |
+| Staged row count growing | Approaching cap — approve schema or scale worker/TSDB |
+| Device logs "pause_lineage" | Device correctly buffering |
+
+```bash
+platform-tui events watch
+# Look for integration.edge_table_lineage.ingestion_paused
+```
+
+## Operator responses
+
+| Situation | Action |
+|-----------|--------|
+| Pause during schema review | Normal — [approve schema](/edge/data-sync/schema-review-workflow) |
+| Pause + staged at cap + no review | Wait for auto-resume or investigate worker health |
+| Device offline during pause | QoS 1 downlink buffered by broker (persistent session) |
+| Buffer lost on device after long pause | Plan bootstrap snapshot (secondary flow) when available |
+
+## Related
+
+- [Lineages and staging](/edge/data-sync/lineages-and-staging)
+- [Troubleshooting](/edge/data-sync/troubleshooting)

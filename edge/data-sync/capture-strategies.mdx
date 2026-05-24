@@ -1,0 +1,99 @@
+---
+title: Capture strategies
+description: Row journal vs telemetry batches — choosing how tables replicate.
+---
+
+Omega supports two capture strategies per table. Today **row journal** is production-ready; **telemetry batch** is specified but not fully implemented in Omega.
+
+## Row journal (`strategy: rows`)
+
+**Best for:** mutable state, transactional tables, configuration, anything with INSERT/UPDATE/DELETE.
+
+### How it works
+
+1. Triggers on enrolled table write to `__omega_journal`.
+2. Agent assigns monotonic **`commit_seq`** (not SQLite AUTOINCREMENT alone).
+3. Flush loop publishes **`sync/rows/batch`** with operations:
+
+| `op` | `row` field |
+|------|-------------|
+| `insert` | Full row JSON |
+| `update` | Full row JSON |
+| `delete` | `null` |
+
+4. Cloud dedupes per row: `(device_id, source_table, journal_epoch, source_pk_hash, commit_seq)`.
+
+### When to choose rows
+
+- Table has a primary key and changes over time.
+- You want relational mirror in `edge_mirror_*`.
+- Time-series table until telemetry flush ships — **recommended workaround**.
+
+### Example tables
+
+- `device_state` — keyed settings
+- `order_events` — append-only event log with PK
+- `sensor_timeseries` — use rows strategy today
+
+## Telemetry batch (`strategy: telemetry`)
+
+**Best for:** high-volume time-ordered readings with timestamp column (when implemented).
+
+### How it works (spec)
+
+1. Cursor on max `event_ts` included in last accepted batch.
+2. Publish **`sync/telemetry/batch`** every 5s or 512 KiB.
+3. Rows include `ts`, optional `row_id`, and `fields` map.
+4. Cloud dedupes batch on `(device_id, batch_id)`; enforces monotonic **`batch_seq`**.
+
+### Current Omega status
+
+Telemetry flush is a **stub**. Batches are not emitted on the telemetry topic.
+
+**Workaround:** configure time-series tables with `strategy: rows` and approve mirror columns in schema review.
+
+Track: [omega issue #3](https://github.com/golain-io/omega/issues/3).
+
+## Ignore (`strategy: ignore`)
+
+Skip replication for scratch, cache, or local-only tables:
+
+```yaml
+table_strategies:
+  temp_import:
+    strategy: ignore
+```
+
+## Comparison
+
+| | Row journal | Telemetry batch |
+|---|-------------|-----------------|
+| MQTT topic | `sync/rows/batch` | `sync/telemetry/batch` |
+| Dedup | Per row | Per batch + batch_seq |
+| Cloud storage | Mirror table (typical) | Telemetry datapoints (when mapped) |
+| Omega status | **Production** | **Stub** |
+| PK required | Yes | Timestamp column |
+
+## Journal epoch
+
+If Omega truncates/rebuilds `__omega_journal`, it generates a new **`journal_epoch`** (UUIDv7). Required so `commit_seq=1` after reinit does not dedupe against pre-reinit rows.
+
+## Pre-existing rows
+
+Rows present in SQLite **before** Omega starts are **not** in the journal. `snapshot_on_first_run` is not implemented — only mutations **after** trigger install replicate.
+
+To backfill historical data:
+
+- Run application migrations that touch rows after Omega start, or
+- Wait for **bootstrap snapshot** secondary flow (not implemented).
+
+## Schema columns on first batch
+
+First batch for a table may include **`schema_columns`** inline (full fingerprint structure) to aid server classification. Subsequent batches carry **`schema_hash`** only.
+
+→ [Schema governance](/edge/data-sync/schema-governance)
+
+## Related
+
+- [Configuration](/edge/data-sync/configuration)
+- [Payload formats](/edge/data-sync/payload-formats)

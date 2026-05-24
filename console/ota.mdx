@@ -1,0 +1,79 @@
+---
+title: OTA updates
+description: Create releases, schedule deployments, and roll firmware to fleets and tags.
+---
+
+Over-the-air (OTA) updates let you ship firmware or application bundles to selected devices without physical access.
+
+## Concepts
+
+| Term | Meaning |
+|------|---------|
+| **Release** | Versioned artifact metadata (name, compatible device types) |
+| **Deployment** | A rollout binding a release to targets (tags, fleets, devices) |
+| **Trigger** | Starts delivery to eligible online devices |
+| **Cancel** | Stops an in-progress deployment |
+
+## Console workflow
+
+1. **OTA** → **Releases** → create release with name and supported device types.
+2. **Deployments** → create deployment:
+   - Select release
+   - Choose targets (tags, fleets, and/or device names)
+   - Set retry policy and optional schedule
+3. **Trigger** deployment when ready.
+4. Monitor status on deployment detail; cancel if needed.
+
+Devices must run an edge client with the **OTA module** enabled (for example Omega with OTA capability in `security.capabilities`).
+
+## CLI workflow
+
+Set org/project context first — see [Context](/tools/platform-tui/context).
+
+```bash
+# Create release
+platform-tui ota releases create --name=v1.2.0 --device-types=esp32,stm32
+
+# Create deployment targeting prod tag
+platform-tui ota deployments create \
+  --name=deploy-v1.2.0 \
+  --release=v1.2.0 \
+  --target-tags=prod \
+  --max-retries=3 \
+  --retry-interval=60
+
+# Trigger rollout
+platform-tui --yes ota deployments trigger deploy-v1.2.0 --release=v1.2.0
+```
+
+JSON automation example:
+
+```bash
+REL=$(platform-tui --output=json ota releases create --name=v1.3.0 --device-types=esp32 | jq -r .id)
+platform-tui --yes ota deployments create --name=deploy-v1.3.0 --release=$REL --target-tags=prod
+platform-tui --yes ota deployments trigger deploy-v1.3.0 --release=v1.3.0
+```
+
+## Targeting rules
+
+Deployments can combine:
+
+- **target-tags** — devices with any listed tag
+- **target-fleets** — all devices in named fleets
+- **target-devices** — explicit device names
+
+Only devices whose type matches the release's **device-types** receive the update.
+
+## Edge behavior
+
+Omega's OTA module downloads signed artifacts, verifies integrity, and applies updates per profile policy. Control messages use HMAC-signed envelopes — see [Remote control](/edge/remote-control).
+
+## Troubleshooting
+
+| Symptom | Check |
+|---------|-------|
+| Device never updates | Online? Correct tags? OTA module enabled? |
+| Deployment stuck | Retry limits, device logs, deployment status in console |
+| Wrong firmware | Release device-types vs actual device type |
+
+Use `platform-tui ota deployments list --release=<name>` for CLI status inspection.

@@ -1,0 +1,143 @@
+---
+title: How edge SQLite sync works
+description: End-to-end pipeline from application writes to queryable cloud data.
+---
+
+Edge SQLite sync moves data from a **local SQLite database** on a device into **Golain-managed storage** in the cloud. The edge agent captures changes; the cloud governs schema and materializes approved rows.
+
+## What gets replicated
+
+| Source | Mechanism | Cloud destination |
+|--------|-----------|---------------------|
+| Mutable state tables (settings, enrollment, config) | SQLite triggers → journal → `sync/rows/batch` | Relational **mirror table** (`edge_mirror_*`) after schema approval |
+| Time-series tables (sensor readings) | Cursor-based batches → `sync/telemetry/batch` | **Telemetry** (`telemetry_data_point_value`) when columns are mapped |
+| Either shape (today on Omega) | Same row-batch path with `strategy: rows` | Mirror table (recommended until telemetry flush ships) |
+
+The cloud does **not** store a replica of your SQLite file. It stores **governed projections** you approve column-by-column.
+
+## Pipeline stages
+
+### 1. Application writes (device)
+
+Your application reads and writes a normal SQLite database (`source.db`). Omega's module does not require application code changes beyond using SQLite.
+
+### 2. Capture (device)
+
+On startup the `sqlite-replication` module:
+
+1. Discovers user tables (excludes `sqlite_*` and internal `__omega_*` tables).
+2. Installs `AFTER INSERT/UPDATE/DELETE` triggers that append to `__omega_journal`.
+3. Computes a **schema fingerprint** (SHA-256 of canonical column metadata).
+
+Each journal entry records `commit_seq`, operation, primary key JSON, full row JSON (except deletes), and `schema_hash`.
+
+### 3. Publish (device → MQTT)
+
+Every **5 seconds** (or when batch size reaches **512 KiB**), the module:
+
+1. Reads journal entries since the last published `commit_seq`.
+2. Builds a JSON batch with `batch_id` (UUIDv7), `journal_epoch`, and row operations.
+3. Publishes to `{root_topic}/sync/rows/batch` at **QoS 1**.
+
+The device **never** embeds `org_id`, `project_id`, or `device_id` in payloads — the broker derives tenant scope from the mTLS session.
+
+### 4. Broker ingest (cloud)
+
+The MQTT broker:
+
+- Authenticates the device (mTLS or username/password).
+- Enforces topic ACLs (devices cannot publish on `sync/ingest/control`).
+- Strips any untrusted tenant fields from JSON.
+- Forwards to the integration worker via `telemetry.edge_export_segment.received.v1`.
+
+### 5. Worker intake (cloud)
+
+The integration worker:
+
+1. **Dedupes** on `(device_id, batch_id)`.
+2. Records segment metadata in `edge_export_segments` (Timescale).
+3. **Upserts a lineage** — one row per `(device_id, source_table)`.
+
+### 6. Schema classification (cloud)
+
+When a batch carries a **new `schema_hash`**:
+
+| Classification | Typical meaning | Lineage | Rows |
+|----------------|-----------------|---------|------|
+| `compatible_additive` | Safe additive change (policy-dependent) | May stay active | Materialize or stage per policy |
+| `compatible_mapped` | Matches existing bindings | Active | Materialize |
+| `ambiguous` | First sight or unclear mapping | **Paused** | **Staged** |
+| `breaking` | Incompatible change | **Paused** | **Staged** |
+
+Default production policy treats the **first schema** for a table as **ambiguous** → schema review required.
+
+### 7. Staging (cloud)
+
+While lineage is **paused** or materialization is blocked, row bodies are stored in **`edge_staged_rows`** (Timescale) with a reason:
+
+| `staging_reason` | Meaning |
+|------------------|---------|
+| `schema_review` | Waiting for operator approval |
+| `lineage_paused` | Volume backpressure or circuit breaker |
+| `materialization_failed` | Transient mirror write error before pause confirmed |
+
+Staging is **server-side**. The device may continue publishing during schema review; the cloud holds rows until you approve.
+
+### 8. Schema review (operator)
+
+An operator:
+
+1. **Claims** the review (`queued` → `in_review`).
+2. Inspects staged sample rows.
+3. **Approves** with **column actions** (`mirror`, `map`, `ignore`, …) or **rejects**.
+
+On approve the worker provisions mirror DDL, creates **column bindings**, inserts a **replay intent**, and sets lineage **active**.
+
+### 9. Replay and materialization (cloud)
+
+- **Replay** drains staged rows into the mirror table (post-approve backlog).
+- **Live batches** on an **active** lineage write directly to mirror or telemetry.
+
+Mirror tables are named `edge_mirror_{device8}_{table}` (device-scoped) or coalesced names when using [registry coalescing](/edge/data-sync/registry-coalescing).
+
+### 10. Query (operator / product)
+
+Query materialized data via:
+
+- `GET .../edge/lineages/{id}/mirror-rows`
+- platform-tui **Written** view
+- QueryScript against mirror or telemetry tables
+
+→ [Querying synced data](/edge/data-sync/querying-data)
+
+## Two kinds of "pause"
+
+Operators often confuse these — they behave differently:
+
+| Pause cause | Cloud lineage | Device receives `pause_lineage`? | Device should keep sending? |
+|-------------|---------------|-----------------------------------|----------------------------|
+| **Schema review** (ambiguous/breaking) | `paused` | **No** | **Yes** — server stages |
+| **Volume backpressure** (staged cap exceeded) | `paused` | **Yes** | **No** — buffer locally |
+| **Materialization circuit breaker** (repeated errors) | `paused` | **Yes** | **No** — buffer locally |
+
+Schema approval sets lineage **active** in the database but does **not** automatically send `resume_lineage` unless the device was paused by a downlink control message.
+
+→ [Backpressure](/edge/data-sync/backpressure)
+
+## Data stores (cloud)
+
+| Store | Purpose | Operator-visible? |
+|-------|---------|-------------------|
+| `edge_export_segments` | Batch ledger (metadata) | Via API/TUI lineage detail |
+| `edge_staged_rows` | Row bodies awaiting materialization | Staged rows API / TUI **`d`** |
+| `edge_table_lineages` | Lineage status (Postgres OLTP) | Lineages list |
+| `edge_schema_reviews` | Review workflow (OLTP) | Schema reviews list |
+| `edge_mirror_*` | Materialized relational rows (TSDB) | Mirror-rows API / TUI **`w`** |
+| `telemetry_data_point_value` | Mapped telemetry columns | QueryScript / Data explorer |
+
+## Related pages
+
+- [Lineages and staging](/edge/data-sync/lineages-and-staging)
+- [Schema governance](/edge/data-sync/schema-governance)
+- [Omega setup](/edge/data-sync/omega-setup)
+- [Schema review workflow](/edge/data-sync/schema-review-workflow)

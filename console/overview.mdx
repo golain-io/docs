@@ -1,0 +1,74 @@
+---
+title: Console overview
+description: Navigate the Golain web console — org scope, modules, and mock development mode.
+---
+
+The **Golain Platform Web** (`pw`) is the browser UI for managing organizations, projects, fleets, devices, OTA, integrations, and settings.
+
+## Access the console
+
+| Environment | URL |
+|-------------|-----|
+| Production | `https://app.golain.io` (or your operator URL) |
+| Local dev | `http://localhost:5173` after `npm run dev` |
+
+Sign in with **Zitadel OIDC**. After login the app stores your access token and sends it on every API request together with the active **ORG-ID** header.
+
+## Layout
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  Header — org switcher, project switcher, user menu      │
+├──────────────┬──────────────────────────────────────────┤
+│  Sidebar     │  Main content (lazy-loaded feature)      │
+│  (per        │                                          │
+│   project)   │                                          │
+└──────────────┴──────────────────────────────────────────┘
+```
+
+Routes follow `/:org_id/:project_id/<feature>`. Changing org or project updates the URL and reloads scoped data.
+
+## Feature modules
+
+| Module | Purpose |
+|--------|---------|
+| **Home** | Project dashboard and shortcuts |
+| **Fleets & devices** | Fleet CRUD, device list, device detail, certificates |
+| **OTA updates** | Releases, deployments, rollout status |
+| **Connections** | Integration accounts and bindings |
+| **Definitions** | Data points, shadows, contexts |
+| **Dashboard** | Panel visualizations |
+| **Rule engine / Quick rules** | Automation pipelines |
+| **Logs & activities** | Audit and alert views |
+| **Settings** | Org and project configuration |
+| **User authentication** | Members and access |
+| **Analysis / Reports / Query builder** | Data exploration |
+
+Each module loads on demand for faster initial page load.
+
+## Local development with mock data
+
+Developers can run the UI without a live backend:
+
+```bash
+cd pw
+npm install
+cp .env.example .env   # VITE_MOCK_AUTH=true by default
+npm run mock:server    # terminal 1 — Hono API on :8899
+npm run dev            # terminal 2 — Vite on :5173
+```
+
+Mock mode seeds a fake **Dev User** and realistic sample fleets/devices. Switch to real auth by setting `VITE_MOCK_AUTH=false` and configuring Zitadel variables in `.env`.
+
+## Related tools
+
+Many console actions have CLI equivalents in [platform-tui](/tools/platform-tui/overview) — useful for scripting and CI.
+
+<CardGroup cols={2}>
+  <Card title="Fleets & devices" icon="server" href="/console/fleets-and-devices">
+    Create fleets, register devices, view MQTT details.
+  </Card>
+  <Card title="OTA updates" icon="rocket" href="/console/ota">
+    Ship firmware to tagged devices.
+  </Card>
+</CardGroup>

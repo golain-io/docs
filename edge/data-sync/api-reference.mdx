@@ -1,0 +1,119 @@
+---
+title: Edge sync HTTP API
+description: REST endpoints for lineages, schema reviews, registry coalescing, and policy.
+---
+
+Base path:
+
+```
+/core/api/v1/projects/{project_id}/edge/...
+```
+
+Fleet-scoped registry routes also exist under:
+
+```
+/core/api/v1/projects/{project_id}/fleets/{fleet_id}/edge/...
+```
+
+## Authentication
+
+- **`Authorization: Bearer`** — user OIDC token (same as console)
+- **`ORG-ID`** header — active organization
+- Mutations require **`Idempotency-Key`** header (forwarded to integration worker RPC)
+
+## Permissions
+
+| Operation | Permission |
+|-----------|------------|
+| GET lineages, reviews, staged/mirror rows | Authorized SQL read (device→project join) |
+| POST claim/approve/reject, DELETE lineage, reset materialization, PATCH policy | **`PROJECT_CAN_MANAGE_DEVICES`** |
+
+OpenAPI source: [ilyama.v1.yaml](https://github.com/golain-io/ilyama/blob/main/services/apis/openapi/ilyama.v1.yaml) (~line 5766+).
+
+## Lineages
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/edge/lineages` | List lineages. Query: `device_id`, `fleet_id`, `status`, pagination |
+| GET | `/edge/lineages/{lineage_id}` | Detail + schema versions + bindings |
+| GET | `/edge/lineages/{lineage_id}/staged-rows` | Staged row payloads |
+| GET | `/edge/lineages/{lineage_id}/mirror-rows` | Materialized mirror rows |
+| POST | `/edge/lineages/{lineage_id}/reset-materialization` | Clear materialization CB; may resume downlink |
+| DELETE | `/edge/lineages/{lineage_id}` | Remove sync state for device+table |
+
+### Example — list paused lineages
+
+```bash
+curl -s -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/edge/lineages?status=paused"
+```
+
+## Device schema reviews
+
+| Method | Path | Description |
+|--------|------|-------------|
+| GET | `/edge/schema-reviews` | List reviews. Filter: `status`, `lineage_id`, … |
+| GET | `/edge/schema-reviews/{review_id}` | Review detail |
+| POST | `/edge/schema-reviews/{review_id}/claim` | Body: `{ "action_version": N }` |
+| POST | `/edge/schema-reviews/{review_id}/approve` | Body: `{ "action_version", "column_actions": [...] }` |
+| POST | `/edge/schema-reviews/{review_id}/reject` | Body: `{ "action_version", "reason"?: string }` |
+
+→ [Schema review workflow](/edge/data-sync/schema-review-workflow)
+
+## Registry and coalescing (project scope)
+
+| Method | Path |
+|--------|------|
+| GET | `/edge/registry` |
+| GET | `/edge/registry/{registry_id}` |
+| GET | `/edge/registry-reviews` |
+| GET | `/edge/registry-reviews/{review_id}` |
+| POST | `/edge/registry-reviews/{review_id}/claim` |
+| POST | `/edge/registry-reviews/{review_id}/approve` |
+| POST | `/edge/registry-reviews/{review_id}/reject` |
+| POST | `/edge/registry-reviews/{review_id}/abandon` |
+| GET | `/edge/coalesced-mirrors` |
+| GET | `/edge/coalesced-mirrors/{mirror_id}` |
+| POST | `/edge/coalesced-mirrors/{source_table}/consolidate` |
+
+→ [Registry coalescing](/edge/data-sync/registry-coalescing)
+
+## Policy
+
+| Method | Path | Description |
+|--------|------|-------------|
+| PATCH | `/edge/policy` | Set `schema_coalescing_mode`, backlog caps, additive policy flags |
+
+Example:
+
+```json
+{
+  "schema_coalescing_mode": "fleet",
+  "max_pending_rows_per_lineage": 100000,
+  "max_pending_bytes_per_lineage": 1073741824,
+  "resume_threshold_percent": 80
+}
+```
+
+## RPC mapping (internal)
+
+HTTP mutations call integration worker RPCs on `platform_exchange` / `integration_rpc_queue`:
+
+| RPC | HTTP |
+|-----|------|
+| `integration.edge_schema_review.claim` | POST .../claim |
+| `integration.edge_schema_review.approve` | POST .../approve |
+| `integration.edge_schema_review.reject` | POST .../reject |
+| `integration.edge_table_lineage.reset_materialization` | POST .../reset-materialization |
+| `integration.edge_table_lineage.delete` | DELETE lineage |
+| `integration.edge_replication_policy.set_coalescing_mode` | PATCH .../policy |
+| `integration.edge_coalesced_mirror.consolidate` | POST .../consolidate |
+
+## Response envelopes
+
+Follow standard ilyama HTTP JSON envelopes — list endpoints return pagination meta; single resources wrap the object. Errors use `core/errs` public messages.
+
+## Related
+
+- [Querying synced data](/edge/data-sync/querying-data)
+- [platform-tui Edge Sync](/edge/data-sync/platform-tui-guide)

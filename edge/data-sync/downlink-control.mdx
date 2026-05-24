@@ -1,0 +1,116 @@
+---
+title: Downlink control messages
+description: pause_lineage, resume_lineage, and url_grant on sync/ingest/control.
+---
+
+The cloud sends **control messages** to devices on:
+
+```
+{root_topic}/sync/ingest/control
+```
+
+Devices **subscribe** at QoS 1; **never publish** to this topic.
+
+## Shared envelope
+
+```json
+{
+  "control_id": "server-assigned-uuid",
+  "control_kind": "pause_lineage",
+  "source_table": "device_state",
+  "server_watermark": 103,
+  "reason": "backpressure: staged row cap exceeded",
+  "presigned_url": "https://...",
+  "presigned_url_expires_at": "2026-04-28T09:15:00Z"
+}
+```
+
+| Field | pause | resume | url_grant |
+|-------|-------|--------|-----------|
+| `control_id` | ✓ | ✓ | ✓ |
+| `control_kind` | ✓ | ✓ | ✓ |
+| `source_table` | ✓ | ✓ | — |
+| `server_watermark` | ✓ | ✓ | — |
+| `reason` | ✓ | — | — |
+| `presigned_url` | — | — | ✓ |
+| `presigned_url_expires_at` | — | — | ✓ |
+
+## Required device behavior (all kinds)
+
+1. **ACK immediately** on `sync/ingest/ack` with same `control_id`.
+2. Then execute kind-specific logic.
+
+Unacked controls remain in `edge_pending_controls` until ACK received.
+
+## pause_lineage
+
+**When sent:**
+
+- Volume backpressure (staged rows exceed cap)
+- Materialization circuit breaker
+
+**Not sent for:**
+
+- Schema review pause alone (server stages while device keeps sending)
+
+**Device actions:**
+
+1. Stop publishing batches for `source_table`.
+2. Buffer new journal rows **durably** (Omega: `state.db` + buffer store).
+3. Record `server_watermark` — last accepted `commit_seq` (rows) or `batch_seq` (telemetry).
+
+## resume_lineage
+
+**When sent:**
+
+- Backlog drained below resume threshold (auto sweep)
+- After `reset-materialization` when device had been pause-downlinked
+
+**Device actions:**
+
+1. Drain buffer in **commit_seq / batch_seq order** starting at `server_watermark + 1`.
+2. Resume normal 5s flush loop.
+3. If local buffer was lost during pause → request bootstrap snapshot (secondary flow, when available).
+
+## url_grant
+
+Secondary flow for large backfill or spill objects.
+
+**Device actions:**
+
+1. ACK control.
+2. HTTP **PUT** zstd-compressed JSONL (`.jsonl.zst`) to `presigned_url` (15 min TTL).
+3. Publish **finalize** on `sync/ingest/request` with matching `batch_id` and `segment_kind`.
+
+Object max size: **1 GiB**.
+
+## Protocol diagram
+
+```
+Cloud                                 Device
+  |                                     |
+  |-- pause_lineage (QoS1) ------------>|
+  |<-- ingest/ack ----------------------|
+  |                                     | stop publish, buffer
+  |                                     |
+  |-- resume_lineage (QoS1) ----------->|
+  |<-- ingest/ack ----------------------|
+  |                                     | drain buffer, resume
+```
+
+## Omega implementation
+
+Module `sqlite-replication` subscribes to control topic, handles pause/resume in `state/store.go`, ACK via `sync/ingest/ack`.
+
+Verify in logs:
+
+```
+pause_lineage source_table=device_state watermark=103
+resume_lineage source_table=device_state watermark=150
+```
+
+## Related
+
+- [Backpressure](/edge/data-sync/backpressure)
+- [Topics and connection](/edge/data-sync/topics-and-connection)
+- [Payload formats](/edge/data-sync/payload-formats)

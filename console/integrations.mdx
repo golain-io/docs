@@ -1,0 +1,66 @@
+---
+title: Integrations
+description: Connect external providers — LoRaWAN, MDM, webhooks, and gateways.
+---
+
+Integrations connect Golain to external systems: LoRaWAN network servers, mobile device management, webhooks, Modbus gateways, and more.
+
+## Console
+
+Open **Connections** (or **Integrations** depending on UI version) within a project to:
+
+- Register **integration accounts** (provider credentials and capabilities)
+- Create **bindings** linking accounts to project resources
+- View sync status and provider-specific settings
+
+Accounts are scoped to the project. Secrets are stored encrypted — you provide credentials at registration time; they are not shown again in plaintext.
+
+## Supported capabilities
+
+Providers declare capabilities in their manifest. Common ones:
+
+| Capability | Purpose |
+|------------|---------|
+| `ingress` | Inbound webhooks and event ingestion |
+| `discover` | Device or asset discovery |
+| `downlink` / `command` | Send commands to external systems |
+| `enroll` / `verify` | Device enrollment and attestation |
+| `session_broker` | Real-time sessions (for example LiveKit) |
+
+The platform routes mutations through domain workers; integration state uses typed enums and vault-backed secrets.
+
+## CLI
+
+List accounts and bindings from the terminal:
+
+```bash
+platform-tui integrations accounts list
+platform-tui integrations bindings list
+```
+
+Use JSON output for automation:
+
+```bash
+platform-tui --output=jsonl integrations accounts list --limit=100
+```
+
+## Webhooks
+
+HTTP webhook ingestion uses a uniform route shape:
+
+```
+POST /webhooks/{provider_kind}/{account_id}?token=…
+```
+
+Configure the provider to call your API base URL with the issued token. Events flow through ingestion RPCs and emerge as typed domain events after translation.
+
+## Edge SQLite sync
+
+Gateway-class devices using **SQLite replication** appear under **Edge Sync** in platform-tui (lineages, schema reviews). That path is separate from third-party integrations but shares the same project scope.
+
+→ [Edge data sync](/edge/data-sync/overview)
+
+## Next steps
+
+- Register devices discovered by an integration into a [fleet](/console/fleets-and-devices)
+- Monitor integration-related events via `platform-tui events watch`

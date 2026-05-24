@@ -1,0 +1,142 @@
+---
+title: Omega setup for SQLite sync
+description: Build, configure, and run the ilyama-edge Omega client.
+---
+
+Omega ships a production reference client **`ilyama-edge`** for Golain SQLite replication. This page covers build, environment, and first run.
+
+## Prerequisites
+
+- Device registered in Golain ([fleets and devices](/console/fleets-and-devices))
+- mTLS certificate issued for MQTT (see [provisioning checklist](/edge/data-sync/provisioning-checklist))
+- Application SQLite database path on the device
+- Network path to MQTT broker (TLS TCP or QUIC)
+
+## Build
+
+### Client-specific binary (production)
+
+Embeds connection config and only required modules:
+
+```bash
+git clone https://github.com/golain-io/omega
+cd omega
+make build-client CLIENT=ilyama-edge GOOS=linux GOARCH=arm64
+# → bin/omega-linux-arm64
+```
+
+### Development run from source
+
+```bash
+make build
+go run ./cmd/omega -client clients/ilyama-edge-dev.yaml
+```
+
+`ilyama-edge-dev.yaml` adds macOS support and explicit `state_db_path_env`.
+
+## Reference client YAML
+
+`clients/ilyama-edge.yaml`:
+
+```yaml
+name: ilyama-edge
+platform: linux
+connection:
+  transport: mqtt
+  server_url_env: OMEGA_MQTT_BROKER_URL
+  device_id_env: OMEGA_DEVICE_ID
+  root_topic_env: OMEGA_ROOT_TOPIC
+  mqtt:
+    keep_alive: 30s
+    clean_session: false
+    tls:
+      ca_cert_path_env: OMEGA_TLS_CA_PATH
+      client_cert_path_env: OMEGA_TLS_CERT_PATH
+      client_key_path_env: OMEGA_TLS_KEY_PATH
+
+modules:
+  required:
+    - sqlite-replication
+    - heartbeat
+
+security:
+  auth_token_env: OMEGA_AUTH_TOKEN
+  signed_control:
+    enabled: true
+  capabilities:
+    sqlite-replication: true
+    heartbeat: true
+
+sqlite-replication:
+  source_db_path_env: OMEGA_SOURCE_DB_PATH
+  flush_interval: 5s
+```
+
+→ Full field reference: [Configuration](/edge/data-sync/configuration)
+
+## Environment variables
+
+| Variable | Purpose |
+|----------|---------|
+| `OMEGA_MQTT_BROKER_URL` | e.g. `ssl://mqtt.example.com:8883` or `quic://host:port` |
+| `OMEGA_DEVICE_ID` | Device **name** (must match Golain registration / MQTT client id) |
+| `OMEGA_ROOT_TOPIC` | `{topic_slug}/{device_name}` or `/{device_name}` if no slug |
+| `OMEGA_SOURCE_DB_PATH` | Path to application SQLite file |
+| `OMEGA_STATE_DB_PATH` | Persistent cursors/pause state (recommended prod) |
+| `OMEGA_TLS_CA_PATH` | Broker CA PEM |
+| `OMEGA_TLS_CERT_PATH` | Device client cert PEM |
+| `OMEGA_TLS_KEY_PATH` | Device client key PEM |
+| `OMEGA_AUTH_TOKEN` | Control message auth (HMAC envelope) |
+
+Example block:
+
+```bash
+export OMEGA_MQTT_BROKER_URL=ssl://mqtt.ilyama.golain.io:8883
+export OMEGA_DEVICE_ID=gw-floor-2
+export OMEGA_ROOT_TOPIC=acme-prod/gw-floor-2
+export OMEGA_SOURCE_DB_PATH=/var/lib/myapp/data.db
+export OMEGA_STATE_DB_PATH=/var/lib/omega/state.db
+export OMEGA_TLS_CA_PATH=/etc/omega/ca.pem
+export OMEGA_TLS_CERT_PATH=/etc/omega/device.pem
+export OMEGA_TLS_KEY_PATH=/etc/omega/device.key
+export OMEGA_AUTH_TOKEN=<from-provisioning>
+./omega-linux-arm64
+```
+
+## Sample multi-table dev setup
+
+Seed a demo database and run sample client:
+
+```bash
+bash scripts/seed-sample-replication-db.sh
+go run ./cmd/omega -client clients/ilyama-edge-sample.yaml
+# second terminal — mutations after omega installed triggers:
+bash scripts/sample-replication-mutations.sh
+```
+
+Tables: `order_events`, `device_state`, `sensor_timeseries` — all use `strategy: rows` today.
+
+## Verify cloud ingest
+
+1. Console or `platform-tui devices get` — device **connected**.
+2. platform-tui → **Edge Sync → Lineages** — lineages appear per table.
+3. Expect schema review **queued** on first batch — [approve workflow](/edge/data-sync/schema-review-workflow).
+
+## Deploy as service
+
+→ [Deploy Omega](/edge/deploy) (systemd / launchd / Windows)
+
+## Automated deployed e2e (maintainers)
+
+```bash
+echo '<bearer-token>' > .e2e-deployed/bearer.token
+bash scripts/run-deployed-replication-e2e.sh
+```
+
+Details: [omega deployed-e2e-provisioning](https://github.com/golain-io/omega/blob/main/docs/deployed-e2e-provisioning.md).
+
+## Related
+
+- [Capture strategies](/edge/data-sync/capture-strategies)
+- [Provisioning checklist](/edge/data-sync/provisioning-checklist)
+- [Connect to Golain](/edge/connect)

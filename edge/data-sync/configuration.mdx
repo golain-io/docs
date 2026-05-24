@@ -1,0 +1,114 @@
+---
+title: SQLite replication configuration
+description: Omega sqlite-replication module YAML and environment reference.
+---
+
+Configuration lives under the top-level **`sqlite-replication:`** key in client YAML, plus MQTT **`connection:`** settings.
+
+## Connection block
+
+Required for sync — see [topics and connection](/edge/data-sync/topics-and-connection).
+
+| Field | Notes |
+|-------|-------|
+| `transport` | Must be `mqtt` for production |
+| `server_url_env` | Broker URL (`ssl://…:8883` or `quic://…`) |
+| `device_id_env` | Device **name** — not UUID |
+| `root_topic_env` | Prefix for all sync topics |
+| `mqtt.clean_session` | **`false`** — required for downlink buffer |
+| `mqtt.tls.*_env` | mTLS cert paths |
+
+Optional JITR block under `connection.jitr` — see [JITR enrollment](/edge/jitr).
+
+## sqlite-replication fields
+
+| Field | Default | Description |
+|-------|---------|-------------|
+| `source_db_path` | — | Inline path (dev); use `_env` in prod |
+| `source_db_path_env` | — | e.g. `OMEGA_SOURCE_DB_PATH` |
+| `state_db_path` | `{dataDir}/sqlite-replication/state.db` | Cursors, pause, buffer metadata |
+| `state_db_path_env` | — | e.g. `OMEGA_STATE_DB_PATH` — **set in production** |
+| `flush_interval` | `5s` | Batch flush tick |
+| `local_retention_bytes` | 256 MiB | Documented; not fully enforced yet |
+| `table_strategies` | all tables → `rows` | Per-table override — see [capture strategies](/edge/data-sync/capture-strategies) |
+| `snapshot_on_first_run` | `false` | **Not implemented** — flag only |
+
+## table_strategies example
+
+```yaml
+sqlite-replication:
+  source_db_path_env: OMEGA_SOURCE_DB_PATH
+  flush_interval: 5s
+  table_strategies:
+    order_events:
+      strategy: rows
+    device_state:
+      strategy: rows
+    sensor_timeseries:
+      strategy: rows    # use rows until telemetry flush ships
+    sqlite_internal:
+      strategy: ignore
+```
+
+## Strategy values
+
+| Strategy | Behavior |
+|----------|----------|
+| `rows` | Trigger journal → `sync/rows/batch` |
+| `telemetry` | Cursor batches → `sync/telemetry/batch` (**stub in Omega**) |
+| `ignore` | Do not replicate |
+
+## Security capabilities
+
+Enable module in `security.capabilities`:
+
+```yaml
+security:
+  capabilities:
+    sqlite-replication: true
+```
+
+Signed control should stay enabled in production:
+
+```yaml
+security:
+  signed_control:
+    enabled: true
+```
+
+## Tables requirements
+
+- User tables must have explicit **`PRIMARY KEY`** (rowid-only tables are out of scope).
+- System tables (`sqlite_*`) and Omega internals (`__omega_*`) are excluded automatically.
+- After **DDL migrations**, restart Omega to reinstall triggers.
+
+## Persistent state (state.db)
+
+Omega stores per table:
+
+| State | Purpose |
+|-------|---------|
+| `last_published_commit_seq` | Journal cursor |
+| `journal_epoch` | UUIDv7 — changes on journal reinit |
+| `schema_hash` cache | Drift detection |
+| Pause `server_watermark` | Resume after downlink |
+| Backpressure buffer | Rows held while paused |
+
+Loss of `state.db` without backup can cause duplicate publishes (server dedupes) or cursor confusion — treat as part of device backup strategy.
+
+## Validation
+
+```bash
+export OMEGA_AUTH_TOKEN=test
+make validate-client CLIENT=my-device
+make codegen CLIENT=my-device   # validate only, no build
+```
+
+## Module discovery
+
+Omega auto-enrolls all non-system tables when `table_strategies` omits a table (defaults to `rows`). Narrow with explicit ignore rules for scratch tables.
+
+## Related
+
+- [Omega setup](/edge/data-sync/omega-setup)
+- [Limits and rate caps](/edge/data-sync/limits-dedup-errors)

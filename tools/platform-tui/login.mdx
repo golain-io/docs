@@ -1,0 +1,79 @@
+---
+title: Login and authentication
+description: Authenticate platform-tui with Zitadel OIDC device authorization.
+---
+
+`platform-tui` stores credentials per **profile** at `~/.config/platform-tui/profiles/{name}.json` (mode `0600`).
+
+## Device authorization login
+
+```bash
+platform-tui login                      # default profile
+platform-tui login --profile=staging    # named profile
+```
+
+The CLI prompts for:
+
+| Prompt | Example |
+|--------|---------|
+| **API URL** | `https://api.golain.io` |
+| **Zitadel endpoint** | `https://auth.golain.io` |
+| **Client ID** | From your Zitadel Native app |
+
+It prints a user code, opens the verification URL, and polls until you approve. Only the **access token** is persisted — re-run login when it expires.
+
+Check identity:
+
+```bash
+platform-tui whoami
+platform-tui profiles
+platform-tui logout
+```
+
+## Zitadel application setup
+
+Create a **Native** or **User Agent** application with **Device Authorization** enabled (not Web + client secret).
+
+1. Zitadel console → **Projects** → create or select project.
+2. **New Application** → type **Native** / **User Agent**.
+3. Enable **Device Authorization** grant.
+4. Scopes: `openid`, `profile`, `email`.
+5. Copy **Client ID** into the login prompt.
+
+Optional: enable **User roles in token** if you rely on custom Zitadel roles.
+
+## Dev and bypass modes
+
+**Local vm-edge stack** defaults (from `infra/deploy/vm-edge/env/apis.vm.env`):
+
+| Setting | Default |
+|---------|---------|
+| API URL | `http://localhost:19090` |
+| Zitadel | `https://dev.zitadel.golain.io` |
+| Client ID | `258724445991010309@dev-apis` |
+
+Override with env vars: `PLATFORM_API_URL`, `PLATFORM_ZITADEL_ENDPOINT`, `PLATFORM_ZITADEL_CLIENT_ID`.
+
+When apis runs with `AUTH_BYPASS=true`, any bearer token works:
+
+```bash
+PLATFORM_TOKEN=dev PLATFORM_API_URL=http://localhost:19090 platform-tui fleets list
+```
+
+## CI without interactive login
+
+For automated jobs against a bypass or service-account endpoint:
+
+```bash
+export PLATFORM_API_URL=https://api.staging.example.com
+export PLATFORM_TOKEN=<token>
+platform-tui --output=json fleets list
+```
+
+Prefer short-lived tokens and locked-down staging environments for CI.
+
+## Credential file contents
+
+Each profile stores: API URL, Zitadel endpoint, client ID, access token, expiry, and active org/project **context**.
+
+→ [Set context](/tools/platform-tui/context)

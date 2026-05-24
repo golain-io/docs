@@ -1,0 +1,123 @@
+---
+title: CLI reference
+description: Complete platform-tui command reference with examples.
+---
+
+All commands accept global flags: `--profile`, `--output` (`table`|`json`|`jsonl`), `--yes`.
+
+`<name-or-id>` accepts human-readable names or UUIDs.
+
+## Organizations
+
+```bash
+platform-tui orgs list [--page=N] [--limit=N]
+```
+
+## Projects
+
+```bash
+platform-tui projects list
+platform-tui projects create --name=myproject [--region=us-east-1] [--hosting-platform=aws]
+```
+
+## Fleets
+
+```bash
+platform-tui fleets list [--page=N] [--limit=N]
+platform-tui fleets create --name=myfleet [--description="..."]
+platform-tui fleets delete <name-or-id> [--yes]
+```
+
+## Devices
+
+```bash
+platform-tui devices list --fleet=<name-or-id> [--connected=true|false] [--page=N] [--limit=N]
+platform-tui devices get <name-or-id> --fleet=<name-or-id>
+platform-tui devices create --name=sensor-01 --fleet=<name-or-id> [--type=mqtt]
+platform-tui devices delete <name-or-id> --fleet=<name-or-id> [--yes]
+platform-tui devices mqtt-details <name-or-id> --fleet=<name-or-id>
+
+# Device tags
+platform-tui devices tags list <device> --fleet=<name-or-id>
+platform-tui devices tags add  <device> --fleet=<name-or-id> --tags=prod,region-eu
+platform-tui devices tags remove <device> --fleet=<name-or-id> --tags=prod
+```
+
+## Tags
+
+```bash
+platform-tui tags list [--page=N] [--limit=N]
+platform-tui tags create --name=prod
+platform-tui tags delete <name-or-id> [--yes]
+```
+
+## OTA
+
+```bash
+platform-tui ota releases list [--page=N] [--limit=N]
+platform-tui ota releases create --name=v1.2.0 [--device-types=esp32,stm32]
+platform-tui ota releases delete <name-or-id> [--yes]
+
+platform-tui ota deployments list --release=<name-or-id> [--page=N] [--limit=N]
+platform-tui ota deployments create --name=deploy-01 --release=<name-or-id> \
+  [--target-tags=prod,eu] [--target-fleets=fleet-a] [--target-devices=dev-01] \
+  [--max-retries=3] [--retry-interval=60] [--scheduled-at=2025-06-01T00:00:00Z]
+
+platform-tui ota deployments trigger <name-or-id> --release=<name-or-id> [--yes]
+platform-tui ota deployments cancel  <name-or-id> --release=<name-or-id> [--yes]
+platform-tui ota deployments delete  <name-or-id> --release=<name-or-id> [--yes]
+```
+
+## Integrations
+
+```bash
+platform-tui integrations accounts list [--page=N] [--limit=N]
+platform-tui integrations bindings list [--page=N] [--limit=N]
+```
+
+## Users
+
+```bash
+platform-tui users list [--email=user@example.com] [--permission=owner|admin|member|viewer] [--page=N] [--limit=N]
+```
+
+## Events
+
+**Snapshots:**
+
+```bash
+platform-tui events list                            # audit (default)
+platform-tui events list --source=mqtt
+platform-tui events list --source=tsdb
+platform-tui events list --source=audit --page=2 --limit=100
+```
+
+**Live SSE** (blocks until Ctrl-C):
+
+```bash
+platform-tui events watch
+platform-tui events watch --device=<uuid>
+platform-tui events watch --replay-since=2025-06-01T00:00:00Z
+```
+
+## Utility
+
+```bash
+platform-tui version
+platform-tui completions bash|zsh|fish
+```
+
+## Agent / CI patterns
+
+```bash
+# JSON lines for jq processing
+platform-tui --output=jsonl devices list --fleet=sensors
+
+# Create and capture ID
+ID=$(platform-tui --output=json devices create --name=test-01 --fleet=sensors | jq -r .id)
+
+# Non-interactive destructive ops
+platform-tui --yes ota deployments trigger my-deployment --release=v1.2.0
+```
+
+→ [TUI guide](/tools/platform-tui/tui-guide)

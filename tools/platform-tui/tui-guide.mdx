@@ -1,0 +1,95 @@
+---
+title: TUI guide
+description: Interactive terminal UI navigation and screens in platform-tui.
+---
+
+Launch the TUI with no subcommand:
+
+```bash
+platform-tui
+platform-tui --profile=prod
+```
+
+## Key bindings
+
+| Key | Action |
+|-----|--------|
+| `↑` / `↓` | Navigate list |
+| `Enter` / `→` | Select / drill down |
+| `Esc` | Go back |
+| `/` | Filter list |
+| `n` / `p` | Next / previous page |
+| `r` | Reload current screen |
+| `q` / `Ctrl+C` | Quit |
+
+## Navigation tree
+
+```
+Orgs → Projects → Project menu
+                    ├── Fleets → Devices → Device detail (MQTT + tags)
+                    ├── OTA Releases → Deployments
+                    ├── Integrations (bindings)
+                    ├── Stats & Graphs
+                    ├── Event Stream (live SSE)
+                    ├── Data Explorer (QueryScript)
+                    └── Edge Sync
+                         ├── Lineages
+                         └── Schema Reviews → Review detail
+```
+
+## Stats & graphs
+
+Shows device connectivity as Unicode gauge bars:
+
+```
+  DEVICES
+  Total                42
+  Online               [████████░░░░░░░░░░░░░░░░░░░░░░]  43%   18 / 42
+  Offline              [███░░░░░░░░░░░░░░░░░░░░░░░░░░░]  24%   10 / 42
+  Never connected      [████████░░░░░░░░░░░░░░░░░░░░░░]  33%   14 / 42
+```
+
+## Device detail
+
+Select a device to view:
+
+- MQTT broker host, port, TLS, client ID
+- Allowed topic filters (kind, access, pattern)
+- Tags on the device
+
+## Event stream
+
+Connects to `GET /projects/{id}/events/stream` with 24h replay on connect. Events appear as:
+
+```
+[HH:MM:SS.mmm] domain.entity.action  outcome  message
+```
+
+Press `r` to reconnect; `↑/↓` to scroll history.
+
+## Data explorer
+
+Posts **QueryScript v2** JSON to `POST /projects/{id}/queryscript`.
+
+- Edit JSON in the textarea
+- `Ctrl+Enter` to run
+- Browse tabular results in scrollable viewport
+- `e` edit · `r` re-run
+
+## Edge sync
+
+Governance UI for SQLite replication:
+
+1. **Lineages** — active sync pipelines from edge devices
+2. Select lineage → schema fingerprints
+3. **`d`** — staged payloads · **`w`** — written/materialized rows
+4. **`s`** / **`w`** toggle on data screen
+5. **Schema reviews** — claim, approve, or reject schema changes
+
+Written data reads the relational mirror when provisioned; otherwise defaults to QueryScript against telemetry tables.
+
+→ Full guide: [Edge SQLite sync](/edge/data-sync/overview) · [platform-tui Edge Sync](/edge/data-sync/platform-tui-guide)
+
+## Screenshots
+
+The ilyama repo includes generated TUI screenshots under `tools/platform-tui/test/screenshots/` for regression testing — useful as visual reference when writing internal runbooks.

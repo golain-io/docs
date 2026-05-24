@@ -1,0 +1,106 @@
+---
+title: VM edge deployment
+description: ZITADEL, Traefik, TLS data plane, and platform services on a VM.
+---
+
+The **vm-edge** bundle under `ilyama/infra/deploy/vm-edge/` deploys a production-like Golain stack with:
+
+- **ZITADEL** + **Traefik** wildcard TLS (Let's Encrypt via Cloudflare DNS-01)
+- **Internal PKI** for Postgres, RabbitMQ, and Timescale mTLS
+- Optional HTTP APIs and MQTT pass-through for devices
+
+## vs local dev
+
+| Stack | Command | TLS |
+|-------|---------|-----|
+| Laptop deps | `make dev-infra` | No |
+| VM data plane | `compose.data-plane-tls.yaml` | Yes |
+
+## Cloudflare DNS
+
+```bash
+cd ilyama/infra/deploy/vm-edge
+npm install
+npx wrangler login
+```
+
+Create API token with **Zone DNS Edit** + **Zone Read**. Set `CF_DNS_API_TOKEN` in `.env`.
+
+Sync A records to your VM public IP:
+
+```bash
+export CF_DNS_API_TOKEN=...
+export ILYAMA_PUBLIC_IP=203.0.113.10
+export BASE_DOMAIN=ilyama.golain.io
+./scripts/dns-sync-cloudflare.sh
+```
+
+## Internal PKI
+
+```bash
+cd ilyama/infra/deploy/vm-edge/certs
+./gen-pki.sh
+```
+
+Generates internal CA, MQTT broker CA, and leaf certs for services. Override SANs if hostnames differ:
+
+```bash
+DATA_PLANE_SAN=DNS:db.example.internal,DNS:amqp.example.internal ./gen-pki.sh
+```
+
+## Data plane (Postgres + Rabbit + Timescale)
+
+```bash
+cd ilyama/infra/deploy/vm-edge
+cp .env.data-plane.example .env.data-plane
+docker compose --env-file .env.data-plane -f compose.data-plane-tls.yaml up -d
+```
+
+Migrate from repo root with TLS client certs:
+
+```bash
+export COMPOSE_FILE=infra/deploy/vm-edge/compose.data-plane-tls.yaml
+export COMPOSE_ENV_FILE=infra/deploy/vm-edge/.env.data-plane
+export POSTGRES_SSL_MODE=verify-full
+export POSTGRES_ROOT_CERT_LOC=$PWD/infra/deploy/vm-edge/certs/generated/internal-ca/chain.pem
+export POSTGRES_CLIENT_CERT_LOC=$PWD/infra/deploy/vm-edge/certs/generated/internal-leaf/apis.pem
+export POSTGRES_CLIENT_KEY_LOC=$PWD/infra/deploy/vm-edge/certs/generated/internal-leaf/apis.key
+
+make migrate-up
+make rabbitmq-topology
+make eventbus-seed
+```
+
+## Application stack
+
+```bash
+make vm-edge-stack-up
+```
+
+Copy per-service env from `infra/deploy/vm-edge/env/*.vm.env.example` into `services/apis/.env`, `services/domain-workers/.env`, etc.
+
+Wire Zitadel settings:
+
+- `ZITADEL_ENDPOINT`
+- OAuth client IDs for apis, console, platform-tui
+
+## Device certificates
+
+Production device mTLS goes through the **cert worker** RPCs — not ad-hoc issuance. JITR bootstrap certs tie to fleet provisioning.
+
+## platform-tui against vm-edge
+
+Dev defaults pre-fill from `infra/deploy/vm-edge/env/apis.vm.env`:
+
+| Setting | Default |
+|---------|---------|
+| API URL | `http://localhost:19090` |
+| Zitadel | `https://dev.zitadel.golain.io` |
+
+Do **not** use `auth.ilyama.golain.io` for this stack — that is a separate local Zitadel compose profile.
+
+## Full operator guide
+
+Detailed steps, Zitadel compose fetch, smoke tests, and HTTP API overlays: [ilyama/infra/deploy/vm-edge/README.md](https://github.com/golain-io/ilyama/blob/main/infra/deploy/vm-edge/README.md)
+
+AWS VM bootstrap: [ilyama/infra/deploy/aws-vm/README.md](https://github.com/golain-io/ilyama/blob/main/infra/deploy/aws-vm/README.md)

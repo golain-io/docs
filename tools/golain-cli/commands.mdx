@@ -1,0 +1,78 @@
+---
+title: Golain CLI commands
+description: golain login, set, devices, ssh, and config reference.
+---
+
+## `golain login`
+
+Authenticate with Zitadel OAuth2. Opens default browser, stores token securely.
+
+```bash
+golain login
+```
+
+## `golain set`
+
+Configure default org, project, and fleet for later commands.
+
+```bash
+golain set --org-id=UUID --project-id=UUID --fleet-id=UUID
+
+# Individual values
+golain set --org-id=UUID
+golain set --project-id=UUID
+golain set --fleet-id=UUID
+```
+
+## `golain devices`
+
+List devices in the configured fleet.
+
+```bash
+golain devices
+golain devices --org-id=UUID --project-id=UUID --fleet-id=UUID
+```
+
+Output columns: name, device ID, connection status, last seen.
+
+## `golain device`
+
+Detail view for one device.
+
+```bash
+golain device "sensor-01"
+golain device "Living Room Hub"
+```
+
+## `golain ssh`
+
+Interactive shell via MQTT bridge.
+
+```bash
+golain ssh "sensor-01"
+```
+
+Prerequisites:
+
+- Device name must exist in configured fleet
+- Edge client online with SSH/RPC modules enabled
+- Your user has permission to access the device
+
+## `golain config`
+
+Print current configuration (org, project, fleet, truncated token, version).
+
+```bash
+golain config
+```
+
+## Global flags
+
+| Flag | Description |
+|------|-------------|
+| `-c, --config` | Path to config file |
+
+## Related
+
+- [Platform CLI](/tools/platform-tui/overview) — broader API coverage
+- [Edge remote control](/edge/remote-control) — RPC and SSH on Omega

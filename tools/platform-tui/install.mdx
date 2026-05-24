@@ -1,0 +1,84 @@
+---
+title: Install platform-tui
+description: Build or download platform-tui from the ilyama repository.
+---
+
+## From source (recommended)
+
+Requires **Go 1.25+** and the [ilyama](https://github.com/golain-io/ilyama) repository.
+
+```bash
+git clone https://github.com/golain-io/ilyama.git
+cd ilyama
+
+# Build binary → tools/platform-tui/dist/platform-tui
+make platform-tui-build
+
+# Add to PATH (optional)
+sudo ln -sf "$(pwd)/tools/platform-tui/dist/platform-tui" /usr/local/bin/platform-tui
+```
+
+## Run without installing
+
+```bash
+cd ilyama
+make platform-tui-login   # authenticate
+make platform-tui           # launch TUI
+```
+
+Or directly:
+
+```bash
+cd ilyama/tools/platform-tui
+GOWORK=off go run ./cmd/platform-tui [command]
+```
+
+<Note>
+  `GOWORK=off` avoids the repo workspace `replace` for the MQTT fork when running from source on machines without `third_party/mochi-server/`.
+</Note>
+
+## Verify
+
+```bash
+platform-tui version
+platform-tui whoami
+```
+
+## Shell completions
+
+```bash
+# bash
+source <(platform-tui completions bash)
+
+# zsh
+platform-tui completions zsh | source
+
+# fish
+platform-tui completions fish | source
+```
+
+## CI and version stamping
+
+Production builds inject version via ldflags:
+
+```bash
+go build -ldflags "-X golain.io/tools/platform-tui/internal/cli.Version=v1.2.3" \
+  -o dist/platform-tui ./cmd/platform-tui
+```
+
+The Makefile `platform-tui-build` target uses git tags in CI.
+
+## Regenerate API types
+
+If the OpenAPI spec changes:
+
+```bash
+make platform-tui-gen
+make platform-tui-build
+```
+
+Requires `oapi-codegen` v2 and Python 3.
+
+## Next step
+
+→ [Login and authentication](/tools/platform-tui/login)

@@ -1,0 +1,76 @@
+---
+title: Install Omega
+description: Download or build Omega for Linux, macOS, and Windows.
+---
+
+## Pre-built binaries
+
+Download from [GitHub Releases](https://github.com/golain-io/omega/releases).
+
+| Platform | Architecture | Archive |
+|----------|-------------|---------|
+| Linux | x86_64 | `omega_vX.Y.Z_linux_amd64.tar.gz` |
+| Linux | ARM64 | `omega_vX.Y.Z_linux_arm64.tar.gz` |
+| macOS | Intel | `omega_vX.Y.Z_darwin_amd64.tar.gz` |
+| macOS | Apple Silicon | `omega_vX.Y.Z_darwin_arm64.tar.gz` |
+| Windows | x86_64 | `omega_vX.Y.Z_windows_amd64.zip` |
+
+### Linux / macOS
+
+```bash
+curl -L https://github.com/golain-io/omega/releases/latest/download/omega_linux_amd64.tar.gz | tar xz
+sudo mv omega /usr/local/bin/
+omega -version
+```
+
+### Windows
+
+1. Download the `.zip` from releases
+2. Extract to `C:\Program Files\Omega\`
+3. Add to PATH
+4. Run `omega -version` in a new terminal
+
+## Build from source
+
+Requires **Go 1.25+**.
+
+```bash
+git clone https://github.com/golain-io/omega
+cd omega
+make build
+./bin/omega-$(uname -s | tr '[:upper:]' '[:lower:]')-$(uname -m | sed 's/x86_64/amd64/') -version
+```
+
+### Cross-compile
+
+```bash
+make build GOOS=linux GOARCH=arm64
+make build GOOS=windows GOARCH=amd64
+make build-all    # all five platform/arch pairs
+```
+
+### Client-specific build
+
+```bash
+make build-client CLIENT=ilyama-edge
+make build-client CLIENT=canebot GOOS=linux GOARCH=arm64
+```
+
+Validate YAML without building:
+
+```bash
+make codegen CLIENT=my-device
+```
+
+## Release bundle contents
+
+```
+omega
+profiles/           # generic test profiles
+clients/
+  _template.yaml    # starting point for custom configs
+```
+
+## Next steps
+
+→ [Configure your client YAML](/edge/configure)

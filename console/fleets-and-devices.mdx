@@ -1,0 +1,104 @@
+---
+title: Fleets and devices
+description: Create fleets, register devices, view connectivity, tags, and MQTT credentials.
+---
+
+Fleets and devices are the core operational objects in Golain. Everything else — OTA, telemetry, SSH — attaches to a **device** inside a **fleet** within a **project**.
+
+## Fleets
+
+### Create a fleet
+
+1. Open your project → **Fleets** → **Create fleet**.
+2. Provide a **name** and optional description.
+3. Save.
+
+Fleets are unique by name within a project. You can also create fleets via CLI:
+
+```bash
+platform-tui fleets create --name=warehouse-sensors --description="Floor 2 BLE gateways"
+```
+
+### List and delete
+
+- Console: fleet list shows device counts and metadata.
+- CLI: `platform-tui fleets list` · delete with `platform-tui fleets delete <name-or-id> --yes`
+
+## Devices
+
+### Register a device
+
+1. Open a fleet → **Devices** → **Add device**.
+2. Set **name** and **type** (typically `mqtt`).
+3. Save and open the device detail page.
+
+CLI equivalent:
+
+```bash
+platform-tui devices create --name=sensor-01 --fleet=warehouse-sensors --type=mqtt
+```
+
+### Device detail
+
+The detail view shows:
+
+| Section | Contents |
+|---------|----------|
+| **Status** | Connected / offline / never connected, last seen |
+| **Identity** | Device ID (UUID), name, fleet |
+| **MQTT** | Broker host, port, TLS, client ID, topic filters |
+| **Tags** | Labels for targeting and filters |
+| **Certificates** | mTLS material when cert-based auth is enabled |
+
+Copy MQTT settings when configuring [Omega](/edge/configure) or third-party MQTT clients.
+
+CLI:
+
+```bash
+platform-tui devices get sensor-01 --fleet=warehouse-sensors
+platform-tui devices mqtt-details sensor-01 --fleet=warehouse-sensors --output=json
+```
+
+### Tags
+
+Tags are project-scoped strings attached to devices.
+
+**Console:** device detail → Tags → add/remove.
+
+**CLI:**
+
+```bash
+platform-tui devices tags list sensor-01 --fleet=warehouse-sensors
+platform-tui devices tags add sensor-01 --fleet=warehouse-sensors --tags=prod,eu
+platform-tui devices tags remove sensor-01 --fleet=warehouse-sensors --tags=prod
+```
+
+Project-level tag CRUD: `platform-tui tags list|create|delete`.
+
+### Delete a device
+
+Removing a device revokes its MQTT credentials and frees the name within the fleet. Confirm in UI or use:
+
+```bash
+platform-tui devices delete sensor-01 --fleet=warehouse-sensors --yes
+```
+
+## Monitoring connectivity
+
+- **Fleet view** — aggregate online/offline counts.
+- **Event stream** — live connect/disconnect and MQTT access events.
+- **platform-tui TUI** — **Stats & graphs** screen shows Unicode gauge bars for fleet connectivity.
+
+```bash
+platform-tui events watch --device=<uuid>
+platform-tui events list --source=mqtt --limit=50
+```
+
+## Edge enrollment
+
+For Golain-managed certificate enrollment instead of manually copying MQTT passwords, configure Omega [JITR](/edge/jitr) with org, project, fleet, and device identity matching the console registration.
+
+## Next steps
+
+- [OTA updates](/console/ota) — deploy firmware to tagged devices
+- [Edge connect](/edge/connect) — bring devices online with Omega

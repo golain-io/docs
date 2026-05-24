@@ -1,0 +1,100 @@
+---
+title: Connect to Golain
+description: MQTT production connection, TLS, topics, and development transports.
+---
+
+Production Omega devices use **MQTT** with TLS. Connection settings live in the `connection:` block of your client YAML (embedded at build time).
+
+## Production MQTT
+
+```yaml
+connection:
+  server_url: "ssl://mqtt.golain.io:8883"
+  transport: mqtt
+  device_id_env: OMEGA_DEVICE_ID
+
+  mqtt:
+    username_env: OMEGA_MQTT_USERNAME
+    password_env: OMEGA_MQTT_PASSWORD
+    keep_alive: 30s
+    clean_session: true
+    tls:
+      ca_cert_path: /etc/omega/ca.pem
+      client_cert_path: /etc/omega/client.pem
+      client_key_path: /etc/omega/client.key
+```
+
+Runtime environment:
+
+```bash
+export OMEGA_DEVICE_ID=fleet-unit-42
+export OMEGA_AUTH_TOKEN=production-secret
+export OMEGA_MQTT_USERNAME=device-42
+export OMEGA_MQTT_PASSWORD=device-pass
+./omega
+```
+
+Copy broker host, credentials, and topic filters from the [console device detail](/console/fleets-and-devices) or `platform-tui devices mqtt-details`.
+
+## Topic namespace
+
+Default root: `omega/{device_id}`
+
+```
+{root}/{module}/control/{action}   # inbound from cloud
+{root}/{module}/report/{type}      # outbound to cloud
+```
+
+Example for device `fleet-unit-42`:
+
+```
+omega/fleet-unit-42/heartbeat/control/ping
+omega/fleet-unit-42/heartbeat/report/status
+omega/fleet-unit-42/device-shadow/control/update
+```
+
+Golain-managed devices may use platform-specific topic layouts — follow MQTT details from the console when not using default Omega roots.
+
+## Transport modes
+
+| Mode | `transport` | Use |
+|------|-------------|-----|
+| MQTT | `mqtt` | Production |
+| HTTP polling | `http` | **Dev only** — mock server, no TLS |
+| In-memory | `memory` | Unit tests |
+
+<Warning>
+  Never deploy HTTP polling transport to production. It has no authentication or TLS.
+</Warning>
+
+## Development mock server
+
+Terminal 1:
+
+```bash
+export OMEGA_AUTH_TOKEN=dev-secret
+make mock-server
+```
+
+Terminal 2:
+
+```bash
+export OMEGA_AUTH_TOKEN=dev-secret
+make run CLIENT=canebot
+```
+
+## Self-hosted broker
+
+Point `server_url` at your operator MQTT endpoint (for example `ssl://mqtt.ilyama.golain.io:8883`). Ensure TLS trust anchors and client certificates match your [vm-edge PKI](/self-hosted/vm-edge).
+
+## Verification
+
+Successful connection logs include broker handshake and module startup. Confirm in:
+
+- Console device status → **connected**
+- `platform-tui events watch --device=<uuid>`
+- `platform-tui events list --source=mqtt`
+
+## Certificate enrollment
+
+For mTLS without manually copying passwords, use [JITR enrollment](/edge/jitr) — Omega obtains device cert and broker URL before MQTT connects.

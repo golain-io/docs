@@ -1,0 +1,46 @@
+---
+title: Install Golain CLI
+description: Build golain-cli from source.
+---
+
+## From source
+
+```bash
+git clone https://github.com/golain-io/golain-cli.git
+cd golain-cli
+go build -o golain ./cli/cmd
+sudo mv golain /usr/local/bin/
+```
+
+Verify:
+
+```bash
+golain config
+```
+
+## Production endpoints
+
+The CLI defaults to Golain cloud endpoints:
+
+- API: `https://api.golain.io`
+- Auth: `https://zitadel.golain.io`
+
+Self-hosted operators must build from source with updated endpoints or use environment/configuration overrides if supported by your fork.
+
+## First login
+
+```bash
+golain login
+```
+
+Opens the system browser for Zitadel OAuth2. Token is stored locally for subsequent commands.
+
+Then configure defaults:
+
+```bash
+golain set --org-id=<uuid> --project-id=<uuid> --fleet-id=<uuid>
+```
+
+Find IDs in the console URL or via [platform-tui](/tools/platform-tui/cli-reference).
+
+→ [Command reference](/tools/golain-cli/commands)
