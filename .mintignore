@@ -14,7 +14,7 @@ essentials/
 ai-tools/
 agent-ready/
 snippets/
-quickstart.mdx
-development.mdx
+/quickstart.mdx
+/development.mdx
 api-reference/endpoint/
 api-reference/openapi.json
