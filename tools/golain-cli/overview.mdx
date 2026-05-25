@@ -1,17 +1,21 @@
 ---
-title: Golain CLI overview
-description: Command-line SSH and device access for field operators.
+title: Device SSH CLI overview
+description: Command-line SSH and device access for field operators (golain-cli).
 ---
 
 **golain-cli** is a focused CLI for operators who need quick **device list** and **SSH access** through Golain's MQTT bridge. It lives in [golain-io/golain-cli](https://github.com/golain-io/golain-cli).
 
+<Note>
+  This is **not** the same tool as **golain** (platform CLI/TUI from [ilyama](https://github.com/golain-io/ilyama)). For fleet management, Omega deploy, and edge sync governance, use [golain](/tools/platform-tui/overview).
+</Note>
+
 ## When to use it
 
-| Use golain-cli | Use platform-tui instead |
-|----------------|--------------------------|
+| Use golain-cli (this tool) | Use golain instead |
+|----------------------------|---------------------|
 | SSH into a named device | Full fleet CRUD, OTA, integrations |
 | Quick device status check | JSON/CI automation |
-| Field technician laptop | TUI data explorer, edge sync |
+| Field technician laptop | TUI data explorer, edge sync, Omega scaffold |
 
 ## Typical session
 

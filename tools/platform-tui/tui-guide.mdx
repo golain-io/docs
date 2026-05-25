@@ -1,14 +1,16 @@
 ---
 title: TUI guide
-description: Interactive terminal UI navigation and screens in platform-tui.
+description: Interactive terminal UI navigation and screens in golain.
 ---
 
 Launch the TUI with no subcommand:
 
 ```bash
-platform-tui
-platform-tui --profile=prod
+golain
+golain --profile=prod
 ```
+
+(`platform-tui` symlink works the same way.)
 
 ## Key bindings
 
@@ -27,6 +29,7 @@ platform-tui --profile=prod
 ```
 Orgs → Projects → Project menu
                     ├── Fleets → Devices → Device detail (MQTT + tags)
+                    │                         └── O → Deploy Omega wizard
                     ├── OTA Releases → Deployments
                     ├── Integrations (bindings)
                     ├── Stats & Graphs
@@ -56,6 +59,8 @@ Select a device to view:
 - MQTT broker host, port, TLS, client ID
 - Allowed topic filters (kind, access, pattern)
 - Tags on the device
+
+Press **`O`** to open the **Deploy Omega** wizard (downloads Omega + SQLite deps from CDN, scaffolds replication). → [Omega deploy](/tools/platform-tui/omega-deploy)
 
 ## Event stream
 
@@ -88,7 +93,7 @@ Governance UI for SQLite replication:
 
 Written data reads the relational mirror when provisioned; otherwise defaults to QueryScript against telemetry tables.
 
-→ Full guide: [Edge SQLite sync](/edge/data-sync/overview) · [platform-tui Edge Sync](/edge/data-sync/platform-tui-guide)
+→ Full guide: [Edge SQLite sync](/edge/data-sync/overview) · [golain Edge Sync](/edge/data-sync/platform-tui-guide)
 
 ## Screenshots
 

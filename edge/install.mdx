@@ -1,11 +1,66 @@
 ---
 title: Install Omega
-description: Download or build Omega for Linux, macOS, and Windows.
+description: Install Omega from the Golain CDN, GitHub Releases, or build from source.
 ---
 
-## Pre-built binaries
+## CDN install (recommended)
 
-Download from [GitHub Releases](https://github.com/golain-io/omega/releases).
+Omega is published at **https://tools.ilyama.golain.io/omega/** with the same channel layout as golain (`stable`, `latest`, `dev`).
+
+```bash
+curl -fsSL https://tools.ilyama.golain.io/omega/install.sh | sh
+```
+
+Options:
+
+```bash
+# Channel or pinned version
+curl -fsSL https://tools.ilyama.golain.io/omega/install.sh | sh -s -- --channel=dev
+curl -fsSL https://tools.ilyama.golain.io/omega/install.sh | sh -s -- --version=0.1.2b --prefix=$HOME/.local/bin
+
+# Verify
+omega -version
+```
+
+| Flag / env | Purpose |
+|------------|---------|
+| `--channel=stable\|latest\|dev` | Release channel (`OMEGA_CHANNEL`) |
+| `--version=VERSION` | Pin version (`OMEGA_VERSION`) |
+| `--prefix=DIR` | Install directory (default `$HOME/.local/bin`) |
+| `OMEGA_BASE_URL` | CDN root (default `https://tools.ilyama.golain.io/omega`) |
+
+Manifests: `https://tools.ilyama.golain.io/omega/manifest/{stable,latest,dev}.json`
+
+Supported platforms via CDN: **Linux** and **macOS** (`amd64`, `arm64`).
+
+## SQLite extensions and omega-db
+
+SQLite replication needs loadable **JSON** and **timeseries** extensions plus the **`omega-db`** helper for trigger setup and mutations.
+
+```bash
+curl -fsSL https://tools.ilyama.golain.io/omega/install-sqlite-deps.sh | sh
+```
+
+Default install locations:
+
+| Component | Default path |
+|-----------|--------------|
+| `omega-db` | `$HOME/.local/bin/omega-db` |
+| Extensions | `$HOME/.local/lib/golain/sqlite-ext/` |
+
+Options: `--channel`, `--version`, `--prefix`, `--ext-dir`, `--arch=GOOS_GOARCH`.
+
+Manifest asset keys: `sqlite_deps_{darwin,linux}_{amd64,arm64}`.
+
+<Tip>
+  **`golain omega scaffold`** and the TUI **Deploy Omega** wizard download Omega and SQLite deps automatically into the deployment output directory. Use the standalone installers when you only need Omega or deps without scaffolding.
+</Tip>
+
+→ [Omega deploy with golain](/tools/platform-tui/omega-deploy)
+
+## GitHub Releases (alternative)
+
+Pre-built archives are also on [GitHub Releases](https://github.com/golain-io/omega/releases):
 
 | Platform | Architecture | Archive |
 |----------|-------------|---------|
@@ -15,20 +70,13 @@ Download from [GitHub Releases](https://github.com/golain-io/omega/releases).
 | macOS | Apple Silicon | `omega_vX.Y.Z_darwin_arm64.tar.gz` |
 | Windows | x86_64 | `omega_vX.Y.Z_windows_amd64.zip` |
 
-### Linux / macOS
-
 ```bash
 curl -L https://github.com/golain-io/omega/releases/latest/download/omega_linux_amd64.tar.gz | tar xz
 sudo mv omega /usr/local/bin/
 omega -version
 ```
 
-### Windows
-
-1. Download the `.zip` from releases
-2. Extract to `C:\Program Files\Omega\`
-3. Add to PATH
-4. Run `omega -version` in a new terminal
+Windows: download the `.zip`, extract, add to PATH, run `omega -version`.
 
 ## Build from source
 
@@ -50,6 +98,8 @@ make build-all    # all five platform/arch pairs
 ```
 
 ### Client-specific build
+
+Production binaries embed connection config and only required modules:
 
 ```bash
 make build-client CLIENT=ilyama-edge
@@ -73,4 +123,4 @@ clients/
 
 ## Next steps
 
-→ [Configure your client YAML](/edge/configure)
+→ [Configure your client YAML](/edge/configure) · [Deploy with golain scaffold](/tools/platform-tui/omega-deploy)

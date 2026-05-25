@@ -1,18 +1,66 @@
 ---
 title: Omega setup for SQLite sync
-description: Build, configure, and run the ilyama-edge Omega client.
+description: Install, configure, and run Omega for Golain SQLite replication.
 ---
 
-Omega ships a production reference client **`ilyama-edge`** for Golain SQLite replication. This page covers build, environment, and first run.
+Omega ships a production reference client **`ilyama-edge`** for Golain SQLite replication. This page covers install paths, environment, and first run.
+
+## Fastest path: golain scaffold
+
+If you have [golain installed](/tools/platform-tui/install) and a registered device:
+
+```bash
+golain login
+golain context set --org=my-org --project=my-project
+
+golain omega scaffold \
+  --device=gw-floor-2 \
+  --fleet=sensors \
+  --sample-db \
+  --transport=tls \
+  --verify-tables
+```
+
+This command:
+
+1. Issues or reuses MQTT mTLS certificates
+2. Seeds a sample SQLite DB (or uses `--db-path` for your own)
+3. Downloads **Omega** and **SQLite deps** from `https://tools.ilyama.golain.io/omega/`
+4. Writes `omega-config.yaml`, `omega-env.sh`, and replication triggers
+
+Run:
+
+```bash
+source ~/.config/golain/omega/gw-floor-2/omega-env.sh
+~/.config/golain/omega/gw-floor-2/omega \
+  -client ~/.config/golain/omega/gw-floor-2/omega-config.yaml
+```
+
+Or use the TUI **Deploy Omega** wizard (`O` on device detail). → [Omega deploy](/tools/platform-tui/omega-deploy)
+
+<Warning>
+  Prefer **`--transport=tls`** when QUIC is unavailable. Some brokers reject QUIC; TLS (`ssl://host:8883`) is the reliable default for first connect.
+</Warning>
+
+## Manual install (CDN)
+
+When not using scaffold:
+
+```bash
+curl -fsSL https://tools.ilyama.golain.io/omega/install.sh | sh
+curl -fsSL https://tools.ilyama.golain.io/omega/install-sqlite-deps.sh | sh
+```
+
+→ [Install Omega](/edge/install)
 
 ## Prerequisites
 
 - Device registered in Golain ([fleets and devices](/console/fleets-and-devices))
-- mTLS certificate issued for MQTT (see [provisioning checklist](/edge/data-sync/provisioning-checklist))
+- mTLS certificate issued for MQTT (scaffold does this automatically; see [provisioning checklist](/edge/data-sync/provisioning-checklist) for manual flow)
 - Application SQLite database path on the device
 - Network path to MQTT broker (TLS TCP or QUIC)
 
-## Build
+## Build from source (development)
 
 ### Client-specific binary (production)
 
@@ -36,7 +84,7 @@ go run ./cmd/omega -client clients/ilyama-edge-dev.yaml
 
 ## Reference client YAML
 
-`clients/ilyama-edge.yaml`:
+Scaffold generates a profile equivalent to `clients/ilyama-edge.yaml`:
 
 ```yaml
 name: ilyama-edge
@@ -88,7 +136,7 @@ sqlite-replication:
 | `OMEGA_TLS_KEY_PATH` | Device client key PEM |
 | `OMEGA_AUTH_TOKEN` | Control message auth (HMAC envelope) |
 
-Example block:
+Example block (also generated in `omega-env.sh`):
 
 ```bash
 export OMEGA_MQTT_BROKER_URL=ssl://mqtt.ilyama.golain.io:8883
@@ -105,7 +153,7 @@ export OMEGA_AUTH_TOKEN=<from-provisioning>
 
 ## Sample multi-table dev setup
 
-Seed a demo database and run sample client:
+When building Omega from source without scaffold:
 
 ```bash
 bash scripts/seed-sample-replication-db.sh
@@ -118,9 +166,16 @@ Tables: `order_events`, `device_state`, `sensor_timeseries` — all use `strateg
 
 ## Verify cloud ingest
 
-1. Console or `platform-tui devices get` — device **connected**.
-2. platform-tui → **Edge Sync → Lineages** — lineages appear per table.
+1. Console or `golain devices get` — device **connected**.
+2. golain TUI → **Edge Sync → Lineages** — lineages appear per table.
 3. Expect schema review **queued** on first batch — [approve workflow](/edge/data-sync/schema-review-workflow).
+
+Maintainer e2e script (ilyama):
+
+```bash
+cd ilyama/tools/platform-tui
+./scripts/verify-omega-scaffold.sh
+```
 
 ## Deploy as service
 
@@ -140,3 +195,4 @@ Details: [omega deployed-e2e-provisioning](https://github.com/golain-io/omega/bl
 - [Capture strategies](/edge/data-sync/capture-strategies)
 - [Provisioning checklist](/edge/data-sync/provisioning-checklist)
 - [Connect to Golain](/edge/connect)
+- [golain Omega deploy](/tools/platform-tui/omega-deploy)

@@ -1,84 +1,87 @@
 ---
 title: CLI reference
-description: Complete platform-tui command reference with examples.
+description: Complete golain command reference with examples.
 ---
 
 All commands accept global flags: `--profile`, `--output` (`table`|`json`|`jsonl`), `--yes`.
 
 `<name-or-id>` accepts human-readable names or UUIDs.
 
+The binary is **`golain`**; **`platform-tui`** remains a symlink for back-compat.
+
 ## Organizations
 
 ```bash
-platform-tui orgs list [--page=N] [--limit=N]
+golain orgs list [--page=N] [--limit=N]
 ```
 
 ## Projects
 
 ```bash
-platform-tui projects list
-platform-tui projects create --name=myproject [--region=us-east-1] [--hosting-platform=aws]
+golain projects list
+golain projects create --name=myproject [--region=us-east-1] [--hosting-platform=aws]
 ```
 
 ## Fleets
 
 ```bash
-platform-tui fleets list [--page=N] [--limit=N]
-platform-tui fleets create --name=myfleet [--description="..."]
-platform-tui fleets delete <name-or-id> [--yes]
+golain fleets list [--page=N] [--limit=N]
+golain fleets create --name=myfleet [--description="..."]
+golain fleets delete <name-or-id> [--yes]
 ```
 
 ## Devices
 
 ```bash
-platform-tui devices list --fleet=<name-or-id> [--connected=true|false] [--page=N] [--limit=N]
-platform-tui devices get <name-or-id> --fleet=<name-or-id>
-platform-tui devices create --name=sensor-01 --fleet=<name-or-id> [--type=mqtt]
-platform-tui devices delete <name-or-id> --fleet=<name-or-id> [--yes]
-platform-tui devices mqtt-details <name-or-id> --fleet=<name-or-id>
+golain devices list --fleet=<name-or-id> [--connected=true|false] [--page=N] [--limit=N]
+golain devices get <name-or-id> --fleet=<name-or-id>
+golain devices create --name=sensor-01 --fleet=<name-or-id> [--type=mqtt]
+golain devices delete <name-or-id> --fleet=<name-or-id> [--yes]
+golain devices mqtt-details <name-or-id> --fleet=<name-or-id>
+golain devices issue-cert <name-or-id> --fleet=<name-or-id> [--algorithm=rsa|ecdsa] [--output-dir=PATH]
 
 # Device tags
-platform-tui devices tags list <device> --fleet=<name-or-id>
-platform-tui devices tags add  <device> --fleet=<name-or-id> --tags=prod,region-eu
-platform-tui devices tags remove <device> --fleet=<name-or-id> --tags=prod
+golain devices tags list <device> --fleet=<name-or-id>
+golain devices tags add  <device> --fleet=<name-or-id> --tags=prod,region-eu
+golain devices tags remove <device> --fleet=<name-or-id> --tags=prod
 ```
 
 ## Tags
 
 ```bash
-platform-tui tags list [--page=N] [--limit=N]
-platform-tui tags create --name=prod
-platform-tui tags delete <name-or-id> [--yes]
+golain tags list [--page=N] [--limit=N]
+golain tags create --name=prod
+golain tags delete <name-or-id> [--yes]
 ```
 
 ## OTA
 
 ```bash
-platform-tui ota releases list [--page=N] [--limit=N]
-platform-tui ota releases create --name=v1.2.0 [--device-types=esp32,stm32]
-platform-tui ota releases delete <name-or-id> [--yes]
+golain ota releases list [--page=N] [--limit=N]
+golain ota releases create --name=v1.2.0 [--device-types=esp32,stm32]
+golain ota releases delete <name-or-id> [--yes]
 
-platform-tui ota deployments list --release=<name-or-id> [--page=N] [--limit=N]
-platform-tui ota deployments create --name=deploy-01 --release=<name-or-id> \
+golain ota deployments list --release=<name-or-id> [--page=N] [--limit=N]
+golain ota deployments create --name=deploy-01 --release=<name-or-id> \
   [--target-tags=prod,eu] [--target-fleets=fleet-a] [--target-devices=dev-01] \
   [--max-retries=3] [--retry-interval=60] [--scheduled-at=2025-06-01T00:00:00Z]
 
-platform-tui ota deployments trigger <name-or-id> --release=<name-or-id> [--yes]
-platform-tui ota deployments cancel  <name-or-id> --release=<name-or-id> [--yes]
-platform-tui ota deployments delete  <name-or-id> --release=<name-or-id> [--yes]
+golain ota deployments trigger <name-or-id> --release=<name-or-id> [--yes]
+golain ota deployments cancel  <name-or-id> --release=<name-or-id> [--yes]
+golain ota deployments delete  <name-or-id> --release=<name-or-id> [--yes]
 ```
 
 ## Integrations
 
 ```bash
-platform-tui integrations accounts list [--page=N] [--limit=N]
-platform-tui integrations bindings list [--page=N] [--limit=N]
+golain integrations accounts list [--page=N] [--limit=N]
+golain integrations bindings list [--page=N] [--limit=N]
 ```
 
 ## Users
 
 ```bash
-platform-tui users list [--email=user@example.com] [--permission=owner|admin|member|viewer] [--page=N] [--limit=N]
+golain users list [--email=user@example.com] [--permission=owner|admin|member|viewer] [--page=N] [--limit=N]
 ```
 
 ## Events
@@ -86,38 +89,73 @@ platform-tui users list [--email=user@example.com] [--permission=owner|admin|mem
 **Snapshots:**
 
 ```bash
-platform-tui events list                            # audit (default)
-platform-tui events list --source=mqtt
-platform-tui events list --source=tsdb
-platform-tui events list --source=audit --page=2 --limit=100
+golain events list                            # audit (default)
+golain events list --source=mqtt
+golain events list --source=tsdb
+golain events list --source=audit --page=2 --limit=100
 ```
 
 **Live SSE** (blocks until Ctrl-C):
 
 ```bash
-platform-tui events watch
-platform-tui events watch --device=<uuid>
-platform-tui events watch --replay-since=2025-06-01T00:00:00Z
+golain events watch
+golain events watch --device=<uuid>
+golain events watch --replay-since=2025-06-01T00:00:00Z
+```
+
+## Omega edge deploy
+
+```bash
+golain omega scaffold \
+  --device=<name-or-id> \
+  --fleet=<name-or-id> \
+  [--org --project --arch --db-path --sample-db --verify-tables --out --channel --transport]
+```
+
+Downloads Omega + SQLite deps from CDN, issues MQTT certs, writes `omega-config.yaml` and `omega-env.sh`. See [Omega deploy](/tools/platform-tui/omega-deploy).
+
+## Release and diagnostics
+
+```bash
+golain version [--check]
+golain upgrade [--force] [--allow-downgrade]
+golain channel get
+golain channel set --name=stable|latest|dev
+golain doctor
+golain report [--open]
 ```
 
 ## Utility
 
 ```bash
-platform-tui version
-platform-tui completions bash|zsh|fish
+golain completions bash|zsh|fish
+golain login [--profile=NAME]
+golain logout [--profile=NAME]
+golain whoami
+golain profiles
+golain context set --org=X [--project=Y]
+golain context get
+golain context unset [--org] [--project]
+golain env get
+golain env set --name=production|staging|local
 ```
 
 ## Agent / CI patterns
 
 ```bash
 # JSON lines for jq processing
-platform-tui --output=jsonl devices list --fleet=sensors
+golain --output=jsonl devices list --fleet=sensors
 
 # Create and capture ID
-ID=$(platform-tui --output=json devices create --name=test-01 --fleet=sensors | jq -r .id)
+ID=$(golain --output=json devices create --name=test-01 --fleet=sensors | jq -r .id)
 
 # Non-interactive destructive ops
-platform-tui --yes ota deployments trigger my-deployment --release=v1.2.0
+golain --yes ota deployments trigger my-deployment --release=v1.2.0
+
+# Scaffold Omega for CI (requires stored credentials)
+golain omega scaffold --device=$ID --fleet=sensors --verify-tables --transport=tls --sample-db
 ```
 
-→ [TUI guide](/tools/platform-tui/tui-guide)
+Environment overrides: `GOLAIN_TOKEN`, `GOLAIN_API_URL`, `GOLAIN_ZITADEL_*` (legacy `PLATFORM_*` aliases still work).
+
+→ [TUI guide](/tools/platform-tui/tui-guide) · [Omega deploy](/tools/platform-tui/omega-deploy)

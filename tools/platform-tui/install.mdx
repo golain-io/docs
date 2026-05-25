@@ -1,9 +1,64 @@
 ---
-title: Install platform-tui
-description: Build or download platform-tui from the ilyama repository.
+title: Install golain
+description: Install the golain CLI from the Golain CDN or build from source.
 ---
 
-## From source (recommended)
+**golain** is the official Golain platform CLI and TUI (formerly `platform-tui`). The CDN installer puts the binary at `~/.local/bin/golain` and adds a transitional **`platform-tui` → `golain` symlink** for existing scripts.
+
+## CDN install (recommended)
+
+Requires **curl**, **tar**, and **jq**. Default channel is **`stable`**.
+
+```bash
+curl -fsSL https://tools.ilyama.golain.io/install.sh | sh
+```
+
+Install options:
+
+```bash
+# Dev or latest channel builds
+curl -fsSL https://tools.ilyama.golain.io/install.sh | sh -s -- --channel=dev
+curl -fsSL https://tools.ilyama.golain.io/install.sh | sh -s -- --channel=latest
+
+# Pin a version or custom prefix
+curl -fsSL https://tools.ilyama.golain.io/install.sh | sh -s -- \
+  --channel=stable --version=0.1.5b --prefix=$HOME/.local/bin
+```
+
+| Flag / env | Purpose |
+|------------|---------|
+| `--channel=stable\|latest\|dev` | Release channel (`GOLAIN_CHANNEL`) |
+| `--version=VERSION` | Pin version instead of channel head (`GOLAIN_VERSION`) |
+| `--prefix=DIR` | Install directory (default `$HOME/.local/bin`) |
+| `GOLAIN_BASE_URL` | CDN root (default `https://tools.ilyama.golain.io`) |
+
+Channel manifests: `https://tools.ilyama.golain.io/manifest/{stable,latest,dev}.json`
+
+## Verify and upgrade
+
+```bash
+golain version
+golain doctor
+golain whoami          # after login
+
+golain channel get
+golain channel set --name=latest
+golain upgrade
+golain upgrade --force   # reinstall same channel version
+```
+
+If `golain version` prints shell syntax errors, the binary may have been corrupted by an old installer — reinstall from CDN:
+
+```bash
+curl -fsSL https://tools.ilyama.golain.io/install.sh | sh -s -- --channel=stable --prefix=$HOME/.local/bin
+file ~/.local/bin/golain   # expect Mach-O or ELF, not ASCII text
+```
+
+## Back-compat: `platform-tui`
+
+The CDN installer creates `platform-tui` as a symlink to `golain`. Either name works; prefer **`golain`** in new docs and scripts.
+
+## From source
 
 Requires **Go 1.25+** and the [ilyama](https://github.com/golain-io/ilyama) repository.
 
@@ -11,19 +66,18 @@ Requires **Go 1.25+** and the [ilyama](https://github.com/golain-io/ilyama) repo
 git clone https://github.com/golain-io/ilyama.git
 cd ilyama
 
-# Build binary → tools/platform-tui/dist/platform-tui
+# Build binary → tools/platform-tui/dist/golain (or platform-tui via Makefile)
 make platform-tui-build
 
-# Add to PATH (optional)
-sudo ln -sf "$(pwd)/tools/platform-tui/dist/platform-tui" /usr/local/bin/platform-tui
+sudo ln -sf "$(pwd)/tools/platform-tui/dist/golain" /usr/local/bin/golain
 ```
 
-## Run without installing
+Run without installing:
 
 ```bash
 cd ilyama
 make platform-tui-login   # authenticate
-make platform-tui           # launch TUI
+make platform-tui         # launch TUI
 ```
 
 Or directly:
@@ -37,47 +91,26 @@ GOWORK=off go run ./cmd/platform-tui [command]
   `GOWORK=off` avoids the repo workspace `replace` for the MQTT fork when running from source on machines without `third_party/mochi-server/`.
 </Note>
 
-## Verify
-
-```bash
-platform-tui version
-platform-tui whoami
-```
-
 ## Shell completions
 
 ```bash
 # bash
-source <(platform-tui completions bash)
+source <(golain completions bash)
 
 # zsh
-platform-tui completions zsh | source
+golain completions zsh | source
 
 # fish
-platform-tui completions fish | source
+golain completions fish | source
 ```
 
-## CI and version stamping
+## Config locations
 
-Production builds inject version via ldflags:
-
-```bash
-go build -ldflags "-X golain.io/tools/platform-tui/internal/cli.Version=v1.2.3" \
-  -o dist/platform-tui ./cmd/platform-tui
-```
-
-The Makefile `platform-tui-build` target uses git tags in CI.
-
-## Regenerate API types
-
-If the OpenAPI spec changes:
-
-```bash
-make platform-tui-gen
-make platform-tui-build
-```
-
-Requires `oapi-codegen` v2 and Python 3.
+| Path | Contents |
+|------|----------|
+| `~/.config/golain/profiles/{name}.json` | Credentials + org/project context |
+| `~/.config/golain/settings.json` | Release channel, API environment |
+| `~/.config/platform-tui/profiles/` | Legacy profile path (still read) |
 
 ## Next step
 

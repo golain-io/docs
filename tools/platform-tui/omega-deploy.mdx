@@ -1,0 +1,140 @@
+---
+title: Omega deploy
+description: Scaffold Omega edge deployments with golain CLI or the TUI wizard.
+---
+
+**golain** can provision a complete Omega + SQLite replication setup for a registered device: MQTT certificates, client YAML, environment script, Omega binary, SQLite extensions, and optional systemd/launchd unit files.
+
+Artifacts are written under `~/.config/golain/omega/{device-name}/` by default.
+
+## Prerequisites
+
+- [golain installed](/tools/platform-tui/install) and [logged in](/tools/platform-tui/login)
+- Org/project context set (`golain context set`)
+- Device registered in a fleet ([console](/console/fleets-and-devices) or `golain devices create`)
+- Network access to **https://tools.ilyama.golain.io/omega/** (Omega + SQLite deps CDN)
+
+## CLI: `golain omega scaffold`
+
+Creates or reuses MQTT device certificates, generates config, downloads Omega and SQLite deps, and optionally seeds a sample database.
+
+```bash
+golain omega scaffold \
+  --device=sensor-01 \
+  --fleet=warehouse \
+  --sample-db \
+  --transport=tls \
+  --out=~/.config/golain/omega/sensor-01
+```
+
+### Flags
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--device` | *(required)* | Device name or UUID |
+| `--fleet` | *(required)* | Fleet name or UUID |
+| `--org` | context org | Override org |
+| `--project` | context project | Override project |
+| `--arch` | host `GOOS_GOARCH` | Target arch (`linux_amd64`, `darwin_arm64`, …) |
+| `--db-path` | — | Existing SQLite source DB (skips sample seed) |
+| `--sample-db` | `false` | Seed demo tables into `source.db` |
+| `--verify-tables` | `false` | Seed unique `vrf_*` tables (avoids lineage collisions in shared projects) |
+| `--out` | `~/.config/golain/omega/{device}` | Output directory |
+| `--channel` | `stable` | Omega CDN channel (`stable`, `latest`, `dev`) |
+| `--transport` | `quic` | MQTT transport (`quic` or `tls`) |
+
+<Warning>
+  Prefer **`--transport=tls`** when QUIC is unavailable or fails against your broker. The scaffold auto-falls back to TLS when the project has MQTT but not QUIC enabled.
+</Warning>
+
+### Output files
+
+| File | Purpose |
+|------|---------|
+| `omega-config.yaml` | Omega client profile (sqlite-replication + heartbeat) |
+| `omega-env.sh` | `OMEGA_*` environment exports (source before running) |
+| `source.db` | Application SQLite DB (when `--sample-db` or `--verify-tables`) |
+| `omega` | Downloaded Omega binary for selected arch |
+| `sqlite-ext/` | JSON and timeseries loadable extensions |
+| `omega-db` | SQLite helper for mutations and trigger setup |
+| `sqlite-mutate.sh` | Wrapper script for post-trigger inserts |
+
+### Run after scaffold
+
+```bash
+source ~/.config/golain/omega/sensor-01/omega-env.sh
+~/.config/golain/omega/sensor-01/omega -client ~/.config/golain/omega/sensor-01/omega-config.yaml
+```
+
+Then open **Edge Sync** in the TUI to claim schema reviews and confirm lineages appear.
+
+### Maintainer verification
+
+The ilyama repo includes an end-to-end check against `api.ilyama.golain.io`:
+
+```bash
+cd ilyama/tools/platform-tui
+./scripts/verify-omega-scaffold.sh
+```
+
+Requires a valid `golain login` session and at least one org/project/fleet.
+
+## TUI: Deploy Omega wizard
+
+Interactive flow from device detail:
+
+```bash
+golain login
+golain context set --org=my-org --project=my-project
+golain    # launch TUI → Fleets → Devices → select device
+```
+
+Press **`O`** on device detail to start **Deploy Omega**.
+
+### Wizard steps
+
+```
+Deploy Omega — target
+  → Source database (sample vrf_* tables or existing path)
+  → Select tables to replicate
+  → Per-table capture strategy (rows / telemetry / ignore)
+  → Config preview (YAML + env.sh)
+  → Download Omega + SQLite deps from CDN
+  → Service setup (systemd / launchd / OpenRC / init.d) or skip
+  → Run guide (start commands + optional replication status)
+```
+
+| Screen | Keys |
+|--------|------|
+| Target (arch, channel, transport) | `↑/↓` change value, `Tab` next field, `Enter` continue |
+| Source DB | `Space` toggle sample vs existing, `Enter` continue |
+| Table select | `Space` toggle table, `Enter` configure selected |
+| Table config | Strategy and column selection |
+| Download | Progress bar (Omega binary + sqlite deps) |
+| Service setup | Init system, service user, boot enable; **`s`** skip to run guide |
+| Run guide | Copy/paste start commands; **`v`** open replication status |
+| Replication status | Polls lineages for device; **`r`** refresh |
+
+Certificates are saved under `~/.config/golain/certs/{device-name}/`.
+
+## CDN assets used
+
+| Asset | CDN path |
+|-------|----------|
+| Omega binary | `https://tools.ilyama.golain.io/omega/manifest/{channel}.json` |
+| SQLite deps bundle | Manifest key `sqlite_deps_{darwin,linux}_{amd64,arm64}` |
+
+Standalone install (without scaffold):
+
+```bash
+curl -fsSL https://tools.ilyama.golain.io/omega/install.sh | sh
+curl -fsSL https://tools.ilyama.golain.io/omega/install-sqlite-deps.sh | sh
+```
+
+→ [Install Omega](/edge/install)
+
+## Related
+
+- [Omega setup for SQLite sync](/edge/data-sync/omega-setup)
+- [Edge Sync in golain TUI](/edge/data-sync/platform-tui-guide)
+- [Schema review workflow](/edge/data-sync/schema-review-workflow)
