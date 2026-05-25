@@ -1,0 +1,45 @@
+---
+title: Authentication
+description: How to authenticate HTTP requests to the Golain Platform API.
+---
+
+All mutating and most read endpoints require an authenticated **user** context (OIDC access token), not device MQTT credentials.
+
+## Headers
+
+| Header | Required | Description |
+|--------|----------|-------------|
+| `Authorization` | Yes | `Bearer <access_token>` from Zitadel OIDC |
+| `ORG-ID` | Yes | UUID of the active organization |
+| `Idempotency-Key` | Mutations | Unique key per logical write; forwarded to domain workers |
+
+Some project-scoped routes also expect the project ID in the URL path (`/projects/{project_id}/…`).
+
+## Obtaining a token
+
+| Client | Method |
+|--------|--------|
+| Web console (`pw`) | Zitadel authorization code flow in browser |
+| `platform-tui` | OAuth device authorization — [login guide](/tools/platform-tui/login) |
+| `golain-cli` | OAuth browser flow |
+
+For local development with `AUTH_BYPASS=true` on apis, any bearer token works together with `X-Test-User-ID` (e2e harness only).
+
+## Playground notes
+
+The interactive API playground on this site sends requests from your browser. You must paste a valid **Bearer token** and **ORG-ID** into the playground auth fields.
+
+<Warning>
+  Do not paste production tokens into shared machines or screenshots. Prefer short-lived staging tokens for playground testing.
+</Warning>
+
+## Device and edge traffic
+
+Devices authenticate to **MQTT** with mTLS or username/password — not this HTTP Bearer flow.
+
+Edge SQLite sync governance uses the same user API (`/projects/{id}/edge/…`) documented in the [edge sync API summary](/edge/data-sync/api-reference).
+
+## Related
+
+- [API introduction](/api-reference/introduction)
+- [Platform concepts — auth](/getting-started/concepts)

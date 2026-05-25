@@ -36,6 +36,20 @@ mint broken-links
 
 Connect the Mintlify GitHub app in the [dashboard](https://dashboard.mintlify.com) to deploy on push to `main`.
 
+### Sync OpenAPI from ilyama
+
+```bash
+cd ../ilyama/services/apis
+go run ./openapi/cmd/sync
+cp openapi/ilyama.v1.json ../../docs/api-reference/ilyama.v1.json
+```
+
+### Brand assets
+
+Logos and favicon live under `logo/` and `favicon.svg`. Source: `golain-web` brand SVGs. Update manually when marketing refreshes assets.
+
+Starter kit pages are disabled via `.mintignore` — see `_starter-disabled/README.md`.
+
 ## AI-assisted editing
 
 ```bash

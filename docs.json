@@ -1,12 +1,12 @@
 {
   "$schema": "https://mintlify.com/docs.json",
-  "theme": "mint",
+  "theme": "maple",
   "name": "Golain",
   "description": "Documentation for the Golain IoT platform — console, CLI, edge runtime, and self-hosted deployment.",
   "colors": {
-    "primary": "#16A34A",
-    "light": "#07C983",
-    "dark": "#15803D"
+    "primary": "#7F12B2",
+    "light": "#5BEB9D",
+    "dark": "#5A0D82"
   },
   "favicon": "/favicon.svg",
   "logo": {
@@ -24,6 +24,16 @@
       "type": "button",
       "label": "Console",
       "href": "https://app.golain.io"
+    }
+  },
+  "api": {
+    "openapi": "api-reference/ilyama.v1.json",
+    "playground": {
+      "display": "interactive"
+    },
+    "examples": {
+      "languages": ["curl", "python", "javascript", "go"],
+      "defaults": "required"
     }
   },
   "navigation": {
@@ -144,6 +154,14 @@
             ]
           }
         ]
+      },
+      {
+        "tab": "API Reference",
+        "pages": [
+          "api-reference/introduction",
+          "api-reference/authentication"
+        ],
+        "openapi": "api-reference/ilyama.v1.json"
       }
     ],
     "global": {

@@ -1,33 +1,45 @@
 ---
-title: 'Introduction'
-description: 'Example section for showcasing API endpoints'
+title: API introduction
+description: Golain Platform HTTP API — base URL, auth, and OpenAPI reference.
 ---
 
-<Note>
-  If you're not looking to build API reference documentation, you can delete
-  this section by removing the api-reference folder.
-</Note>
+The **Golain Platform API** is the HTTP surface for orgs, projects, fleets, devices, integrations, edge replication, OTA, and more. It is implemented by [ilyama](https://github.com/golain-io/ilyama) (`services/apis`).
 
-## Welcome
+## Base URL
 
-There are two ways to build API documentation: [OpenAPI](https://mintlify.com/docs/api-playground/openapi/setup) and [MDX components](https://mintlify.com/docs/api-playground/mdx/configuration). For the starter kit, we are using the following OpenAPI specification.
+| Environment | Base URL |
+|-------------|----------|
+| Production | `https://api.golain.io/core/api/v1` |
+| Self-hosted | `https://api.<your-domain>/core/api/v1` |
+| Local vm-edge | `http://localhost:19090/core/api/v1` |
 
-<Card
-  title="Plant Store Endpoints"
-  icon="leaf"
-  href="https://github.com/mintlify/starter/blob/main/api-reference/openapi.json"
->
-  View the OpenAPI specification file
-</Card>
+Paths in this reference are relative to `/core/api/v1`.
 
-## Authentication
+## OpenAPI specification
 
-All API endpoints are authenticated using Bearer tokens and picked up from the specification file.
+Interactive endpoint pages below are generated from `api-reference/ilyama.v1.json`, synced from `ilyama/services/apis/openapi/ilyama.v1.yaml`.
 
-```json
-"security": [
-  {
-    "bearerAuth": []
-  }
-]
+To refresh after API changes in ilyama:
+
+```bash
+cd ../ilyama/services/apis
+go run ./openapi/cmd/sync
+cp openapi/ilyama.v1.json ../../docs/api-reference/ilyama.v1.json
 ```
+
+## Quick links
+
+<CardGroup cols={2}>
+  <Card title="Authentication" icon="key" href="/api-reference/authentication">
+    Bearer token, ORG-ID header, idempotency keys.
+  </Card>
+  <Card title="Edge sync API" icon="database" href="/edge/data-sync/api-reference">
+    Operator-focused summary of `/edge/*` routes.
+  </Card>
+</CardGroup>
+
+## Response format
+
+Successful JSON responses follow the ilyama v1 envelope conventions (resource wrappers, list pagination meta). Errors use structured `core/errs` payloads with stable error codes.
+
+See the [platform CLI](/tools/platform-tui/overview) and [console](/console/overview) guides for user-facing workflows that call these endpoints.

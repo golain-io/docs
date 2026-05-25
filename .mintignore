@@ -5,3 +5,16 @@
 # Draft content
 drafts/
 *.draft.mdx
+
+# ---------------------------------------------------------------------------
+# Mintlify starter kit (disabled — Golain docs replaced these sections)
+# Remove entries below when repurposing starter content.
+# ---------------------------------------------------------------------------
+essentials/
+ai-tools/
+agent-ready/
+snippets/
+quickstart.mdx
+development.mdx
+api-reference/endpoint/
+api-reference/openapi.json
