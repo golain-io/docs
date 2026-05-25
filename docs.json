@@ -161,11 +161,19 @@
       },
       {
         "tab": "API Reference",
-        "pages": [
-          "api-reference/introduction",
-          "api-reference/authentication"
-        ],
-        "openapi": "api-reference/ilyama.v1.json"
+        "groups": [
+          {
+            "group": "Overview",
+            "pages": [
+              "api-reference/introduction",
+              "api-reference/authentication"
+            ]
+          },
+          {
+            "group": "HTTP API",
+            "openapi": "api-reference/ilyama.v1.json"
+          }
+        ]
       }
     ],
     "global": {

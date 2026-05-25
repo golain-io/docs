@@ -3439,8 +3439,8 @@
     }
   },
   "info": {
-    "description": "HTTP API for the Golain IoT platform (ilyama). Covers orgs, projects, fleets, devices, integrations, edge replication, OTA, and related resources.",
-    "title": "Golain Platform API",
+    "description": "Generation-ready starter contract for ilyama's HTTP API.\nThis is intentionally scoped to stable routes already mounted in services/apis\nso frontend clients can begin integrating against the rewrite immediately.\n",
+    "title": "ilyama Core API",
     "version": "0.1.0"
   },
   "openapi": "3.1.0",
@@ -3507,7 +3507,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /crl/{ca_label}"
+        "summary": "GET /crl/{ca_label}",
+        "tags": [
+          "Certificates (HTTP)"
+        ]
       }
     },
     "/devices/jitr": {
@@ -3537,7 +3540,10 @@
           }
         },
         "security": [],
-        "summary": "Just-in-time registration bootstrap for devices (HMAC verified server-side)"
+        "summary": "Just-in-time registration bootstrap for devices (HMAC verified server-side)",
+        "tags": [
+          "Device JITR"
+        ]
       }
     },
     "/health": {
@@ -3556,7 +3562,10 @@
           }
         },
         "security": [],
-        "summary": "Health check"
+        "summary": "Health check",
+        "tags": [
+          "System"
+        ]
       }
     },
     "/invite": {
@@ -3627,7 +3636,10 @@
             "bearerAuth": []
           }
         ],
-        "summary": "POST /invite"
+        "summary": "POST /invite",
+        "tags": [
+          "System"
+        ]
       }
     },
     "/me/permissions/graph": {
@@ -3670,7 +3682,10 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Get the current user's effective permission graph"
+        "summary": "Get the current user's effective permission graph",
+        "tags": [
+          "System"
+        ]
       }
     },
     "/ocsp": {
@@ -3707,7 +3722,10 @@
           }
         },
         "security": [],
-        "summary": "OCSP responder (RFC 6960 DER request body); returns pre-signed response from DB"
+        "summary": "OCSP responder (RFC 6960 DER request body); returns pre-signed response from DB",
+        "tags": [
+          "Certificates (HTTP)"
+        ]
       }
     },
     "/ocsp/{b64}": {
@@ -3743,7 +3761,10 @@
           }
         },
         "security": [],
-        "summary": "OCSP responder (RFC 5019 base64url path segment)"
+        "summary": "OCSP responder (RFC 5019 base64url path segment)",
+        "tags": [
+          "Certificates (HTTP)"
+        ]
       }
     },
     "/openapi.json": {
@@ -3763,7 +3784,10 @@
           }
         },
         "security": [],
-        "summary": "Fetch machine-readable OpenAPI contract as JSON"
+        "summary": "Fetch machine-readable OpenAPI contract as JSON",
+        "tags": [
+          "System"
+        ]
       }
     },
     "/organizations": {
@@ -3851,7 +3875,10 @@
             "description": "Unauthorized"
           }
         },
-        "summary": "List organizations visible to the caller"
+        "summary": "List organizations visible to the caller",
+        "tags": [
+          "Organizations"
+        ]
       },
       "post": {
         "operationId": "createOrganization",
@@ -3897,7 +3924,10 @@
             "description": "Unauthorized"
           }
         },
-        "summary": "Create an organization"
+        "summary": "Create an organization",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/apps": {
@@ -3992,6 +4022,9 @@
             "bearerAuth": [],
             "orgIdHeader": []
           }
+        ],
+        "tags": [
+          "Organizations"
         ]
       },
       "post": {
@@ -4033,6 +4066,9 @@
             "bearerAuth": [],
             "orgIdHeader": []
           }
+        ],
+        "tags": [
+          "Organizations"
         ]
       }
     },
@@ -4067,6 +4103,9 @@
             "bearerAuth": [],
             "orgIdHeader": []
           }
+        ],
+        "tags": [
+          "Organizations"
         ]
       },
       "get": {
@@ -4109,6 +4148,9 @@
             "bearerAuth": [],
             "orgIdHeader": []
           }
+        ],
+        "tags": [
+          "Organizations"
         ]
       }
     },
@@ -4205,7 +4247,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List user groups"
+        "summary": "List user groups",
+        "tags": [
+          "Organizations"
+        ]
       },
       "post": {
         "operationId": "createOrgGroup",
@@ -4247,7 +4292,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create user group"
+        "summary": "Create user group",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/groups/{group_id}": {
@@ -4302,7 +4350,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete user group"
+        "summary": "Delete user group",
+        "tags": [
+          "Organizations"
+        ]
       },
       "get": {
         "operationId": "getOrgGroup",
@@ -4386,7 +4437,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get user group details"
+        "summary": "Get user group details",
+        "tags": [
+          "Organizations"
+        ]
       },
       "patch": {
         "operationId": "patchOrgGroup",
@@ -4439,7 +4493,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update user group"
+        "summary": "Update user group",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/groups/{group_id}/custom_auth": {
@@ -4473,6 +4530,9 @@
             "bearerAuth": [],
             "orgIdHeader": []
           }
+        ],
+        "tags": [
+          "Organizations"
         ]
       },
       "post": {
@@ -4505,6 +4565,9 @@
             "bearerAuth": [],
             "orgIdHeader": []
           }
+        ],
+        "tags": [
+          "Organizations"
         ]
       }
     },
@@ -4539,6 +4602,9 @@
             "bearerAuth": [],
             "orgIdHeader": []
           }
+        ],
+        "tags": [
+          "Organizations"
         ]
       }
     },
@@ -4581,6 +4647,9 @@
             "bearerAuth": [],
             "orgIdHeader": []
           }
+        ],
+        "tags": [
+          "Organizations"
         ]
       }
     },
@@ -4644,7 +4713,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Remove users from group"
+        "summary": "Remove users from group",
+        "tags": [
+          "Organizations"
+        ]
       },
       "post": {
         "operationId": "addUsersToOrgGroup",
@@ -4697,7 +4769,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Add users to group"
+        "summary": "Add users to group",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts": {
@@ -4748,7 +4823,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List integration accounts for the org"
+        "summary": "List integration accounts for the org",
+        "tags": [
+          "Organizations"
+        ]
       },
       "post": {
         "operationId": "createIntegrationAccount",
@@ -4801,7 +4879,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Register an integration account"
+        "summary": "Register an integration account",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}": {
@@ -4846,7 +4927,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete an integration account"
+        "summary": "Delete an integration account",
+        "tags": [
+          "Organizations"
+        ]
       },
       "get": {
         "operationId": "getIntegrationAccount",
@@ -4899,7 +4983,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a single integration account"
+        "summary": "Get a single integration account",
+        "tags": [
+          "Organizations"
+        ]
       },
       "patch": {
         "operationId": "patchIntegrationAccount",
@@ -4953,7 +5040,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update an integration account"
+        "summary": "Update an integration account",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}/applications": {
@@ -4998,7 +5088,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List namespace applications for an integration account (Tier 0 discovery)"
+        "summary": "List namespace applications for an integration account (Tier 0 discovery)",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}/discover": {
@@ -5054,7 +5147,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Trigger a device discovery scan for an integration account"
+        "summary": "Trigger a device discovery scan for an integration account",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}/discover/{job_id}": {
@@ -5108,7 +5204,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get discovery scan job status"
+        "summary": "Get discovery scan job status",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}/discover/{job_id}/retry": {
@@ -5198,7 +5297,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /organizations/integrations/accounts/{account_id}/discover/{job_id}/retry"
+        "summary": "POST /organizations/integrations/accounts/{account_id}/discover/{job_id}/retry",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}/enroll/{device_id}": {
@@ -5263,7 +5365,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Enroll a device into an external integration namespace"
+        "summary": "Enroll a device into an external integration namespace",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}/enrollments/{enrollment_id}": {
@@ -5317,7 +5422,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Revoke a device enrollment for an integration account"
+        "summary": "Revoke a device enrollment for an integration account",
+        "tags": [
+          "Organizations"
+        ]
       },
       "get": {
         "operationId": "getIntegrationAccountEnrollment",
@@ -5369,7 +5477,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a device enrollment for an integration account"
+        "summary": "Get a device enrollment for an integration account",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}/operator-cert": {
@@ -5452,7 +5563,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Issue an mTLS client certificate for an integration account operator"
+        "summary": "Issue an mTLS client certificate for an integration account operator",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}/pin-version": {
@@ -5508,7 +5622,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Pin the active manifest version for an integration account"
+        "summary": "Pin the active manifest version for an integration account",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}/poll": {
@@ -5564,7 +5681,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Trigger a provider poll / sync for an integration account"
+        "summary": "Trigger a provider poll / sync for an integration account",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/accounts/{account_id}/verify": {
@@ -5609,7 +5729,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Verify connectivity for an integration account"
+        "summary": "Verify connectivity for an integration account",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/bindings": {
@@ -5643,7 +5766,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List org-scoped integration bindings"
+        "summary": "List org-scoped integration bindings",
+        "tags": [
+          "Organizations"
+        ]
       },
       "post": {
         "operationId": "createOrgIntegrationBinding",
@@ -5686,7 +5812,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create an org-scoped integration binding"
+        "summary": "Create an org-scoped integration binding",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/bindings/{binding_id}": {
@@ -5731,7 +5860,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete an org-scoped integration binding"
+        "summary": "Delete an org-scoped integration binding",
+        "tags": [
+          "Organizations"
+        ]
       },
       "get": {
         "operationId": "getOrgIntegrationBinding",
@@ -5774,7 +5906,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get an org-scoped integration binding"
+        "summary": "Get an org-scoped integration binding",
+        "tags": [
+          "Organizations"
+        ]
       },
       "patch": {
         "operationId": "patchOrgIntegrationBinding",
@@ -5828,7 +5963,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update an org-scoped integration binding"
+        "summary": "Update an org-scoped integration binding",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/manifests/validate": {
@@ -5873,7 +6011,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Validate a provider manifest document without publishing"
+        "summary": "Validate a provider manifest document without publishing",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/observability/audit": {
@@ -5931,7 +6072,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List integration audit log entries for the organization"
+        "summary": "List integration audit log entries for the organization",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/observability/automations": {
@@ -5965,7 +6109,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Observability snapshot for automations"
+        "summary": "Observability snapshot for automations",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/observability/integrations": {
@@ -5999,7 +6146,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Observability snapshot for integrations"
+        "summary": "Observability snapshot for integrations",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/observability/realtime": {
@@ -6033,7 +6183,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Observability snapshot for realtime sessions"
+        "summary": "Observability snapshot for realtime sessions",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/observability/secrets": {
@@ -6067,7 +6220,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Observability snapshot for integration secrets"
+        "summary": "Observability snapshot for integration secrets",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/observability/wasm": {
@@ -6101,7 +6257,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Observability snapshot for WASM modules"
+        "summary": "Observability snapshot for WASM modules",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/providers": {
@@ -6143,7 +6302,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List provider manifests in the org registry"
+        "summary": "List provider manifests in the org registry",
+        "tags": [
+          "Organizations"
+        ]
       },
       "post": {
         "operationId": "registerProviderManifestV3",
@@ -6186,7 +6348,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Register a Tier-1 provider manifest"
+        "summary": "Register a Tier-1 provider manifest",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/providers/{kind}": {
@@ -6230,7 +6395,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List manifest versions for a provider kind"
+        "summary": "List manifest versions for a provider kind",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/providers/{kind}/versions/{v}": {
@@ -6282,7 +6450,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a specific provider manifest version"
+        "summary": "Get a specific provider manifest version",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/providers/{kind}/versions/{v}/deprecate": {
@@ -6345,7 +6516,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Deprecate a provider manifest version"
+        "summary": "Deprecate a provider manifest version",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/providers/{kind}/versions/{v}/schemas": {
@@ -6397,7 +6571,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get JSON Schemas for a provider manifest version"
+        "summary": "Get JSON Schemas for a provider manifest version",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/rebind": {
@@ -6442,7 +6619,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Trigger a re-bind job for integration bindings"
+        "summary": "Trigger a re-bind job for integration bindings",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/rebind/{job_id}": {
@@ -6487,7 +6667,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get rebind job status"
+        "summary": "Get rebind job status",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/secrets": {
@@ -6532,7 +6715,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Seal and store an integration secret"
+        "summary": "Seal and store an integration secret",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/secrets/{scope_type}/{scope_id}": {
@@ -6584,7 +6770,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List sealed secret names for a scope"
+        "summary": "List sealed secret names for a scope",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/secrets/{scope_type}/{scope_id}/{name}": {
@@ -6644,7 +6833,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a sealed integration secret"
+        "summary": "Delete a sealed integration secret",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/integrations/secrets/{scope_type}/{scope_id}/{name}/rotate": {
@@ -6715,7 +6907,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Rotate a sealed integration secret"
+        "summary": "Rotate a sealed integration secret",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/invites": {
@@ -6810,7 +7005,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List organization invites"
+        "summary": "List organization invites",
+        "tags": [
+          "Organizations"
+        ]
       },
       "post": {
         "operationId": "createOrgInvite",
@@ -6851,6 +7049,9 @@
             "bearerAuth": [],
             "orgIdHeader": []
           }
+        ],
+        "tags": [
+          "Organizations"
         ]
       }
     },
@@ -6904,6 +7105,9 @@
             "bearerAuth": [],
             "orgIdHeader": []
           }
+        ],
+        "tags": [
+          "Organizations"
         ]
       }
     },
@@ -6995,7 +7199,10 @@
             "bearerAuth": []
           }
         ],
-        "summary": "List permission groups visible to the caller"
+        "summary": "List permission groups visible to the caller",
+        "tags": [
+          "Organizations"
+        ]
       },
       "post": {
         "operationId": "createPermissionGroup",
@@ -7077,7 +7284,10 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Create a permission group"
+        "summary": "Create a permission group",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/permission-groups/{group_id}": {
@@ -7160,7 +7370,10 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Delete a permission group"
+        "summary": "Delete a permission group",
+        "tags": [
+          "Organizations"
+        ]
       },
       "get": {
         "operationId": "getPermissionGroup",
@@ -7241,7 +7454,10 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Get a permission group"
+        "summary": "Get a permission group",
+        "tags": [
+          "Organizations"
+        ]
       },
       "patch": {
         "operationId": "patchPermissionGroup",
@@ -7342,7 +7558,10 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Update a permission group"
+        "summary": "Update a permission group",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/permission-groups/{group_id}/assignments": {
@@ -7443,7 +7662,10 @@
             "bearerAuth": []
           }
         ],
-        "summary": "List assignments for a permission group"
+        "summary": "List assignments for a permission group",
+        "tags": [
+          "Organizations"
+        ]
       },
       "post": {
         "operationId": "createPermissionGroupAssignment",
@@ -7544,7 +7766,10 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Assign a permission group to a subject"
+        "summary": "Assign a permission group to a subject",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/permission-groups/{group_id}/assignments/{assignment_id}": {
@@ -7636,7 +7861,10 @@
             "bearerAuth": []
           }
         ],
-        "summary": "Remove a permission group assignment"
+        "summary": "Remove a permission group assignment",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/properties": {
@@ -7719,7 +7947,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get organization properties (platform-keyed document)"
+        "summary": "Get organization properties (platform-keyed document)",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/properties/{property}": {
@@ -7783,7 +8014,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Patch an organization property"
+        "summary": "Patch an organization property",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/users": {
@@ -7883,7 +8117,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List organization members"
+        "summary": "List organization members",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/users/transfer-ownership/{new_owner_id}": {
@@ -7937,7 +8174,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Transfer organization ownership"
+        "summary": "Transfer organization ownership",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/organizations/users/{user_id}": {
@@ -7991,7 +8231,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Remove user from organization"
+        "summary": "Remove user from organization",
+        "tags": [
+          "Organizations"
+        ]
       },
       "get": {
         "operationId": "getOrgUserPermissions",
@@ -8061,7 +8304,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get organization user permissions"
+        "summary": "Get organization user permissions",
+        "tags": [
+          "Organizations"
+        ]
       },
       "patch": {
         "operationId": "patchOrgUserPermissions",
@@ -8113,7 +8359,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update organization user permissions"
+        "summary": "Update organization user permissions",
+        "tags": [
+          "Organizations"
+        ]
       }
     },
     "/projects": {
@@ -8173,7 +8422,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List projects in the active organization"
+        "summary": "List projects in the active organization",
+        "tags": [
+          "Projects"
+        ]
       },
       "post": {
         "operationId": "createProject",
@@ -8225,7 +8477,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create a project in the active organization"
+        "summary": "Create a project in the active organization",
+        "tags": [
+          "Projects"
+        ]
       }
     },
     "/projects/{project_id}": {
@@ -8289,7 +8544,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}"
+        "summary": "DELETE /projects/{project_id}",
+        "tags": [
+          "Projects"
+        ]
       }
     },
     "/projects/{project_id}/alerts": {
@@ -8415,7 +8673,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Paginated alarm instances for a project (requires project admin)."
+        "summary": "Paginated alarm instances for a project (requires project admin).",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/alerts/{alert_id}/acknowledge": {
@@ -8505,7 +8766,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/alerts/{alert_id}/acknowledge"
+        "summary": "POST /projects/{project_id}/alerts/{alert_id}/acknowledge",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/alerts/{alert_id}/assign": {
@@ -8595,7 +8859,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/alerts/{alert_id}/assign"
+        "summary": "POST /projects/{project_id}/alerts/{alert_id}/assign",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/assets": {
@@ -8660,7 +8927,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/assets"
+        "summary": "GET /projects/{project_id}/assets",
+        "tags": [
+          "Project settings"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdAssets",
@@ -8740,7 +9010,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/assets"
+        "summary": "POST /projects/{project_id}/assets",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/assets/upload-url": {
@@ -8822,7 +9095,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/assets/upload-url"
+        "summary": "POST /projects/{project_id}/assets/upload-url",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/assets/{asset_id}": {
@@ -8894,7 +9170,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/assets/{asset_id}"
+        "summary": "DELETE /projects/{project_id}/assets/{asset_id}",
+        "tags": [
+          "Project settings"
+        ]
       },
       "get": {
         "operationId": "getProjectsProjectIdAssetsAssetId",
@@ -8965,7 +9244,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/assets/{asset_id}"
+        "summary": "GET /projects/{project_id}/assets/{asset_id}",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/assets/{asset_id}/download-url": {
@@ -9038,7 +9320,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/assets/{asset_id}/download-url"
+        "summary": "GET /projects/{project_id}/assets/{asset_id}/download-url",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/audit": {
@@ -9159,7 +9444,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Paginated TSDB audit rows for a project (requires project admin)."
+        "summary": "Paginated TSDB audit rows for a project (requires project admin).",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/blueprints": {
@@ -9224,7 +9512,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/blueprints"
+        "summary": "GET /projects/{project_id}/blueprints",
+        "tags": [
+          "Project settings"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdBlueprints",
@@ -9304,7 +9595,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/blueprints"
+        "summary": "POST /projects/{project_id}/blueprints",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/blueprints/apply": {
@@ -9386,7 +9680,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/blueprints/apply"
+        "summary": "POST /projects/{project_id}/blueprints/apply",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/blueprints/{blueprint_id}": {
@@ -9458,7 +9755,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/blueprints/{blueprint_id}"
+        "summary": "DELETE /projects/{project_id}/blueprints/{blueprint_id}",
+        "tags": [
+          "Project settings"
+        ]
       },
       "get": {
         "operationId": "getProjectsProjectIdBlueprintsBlueprintId",
@@ -9529,7 +9829,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/blueprints/{blueprint_id}"
+        "summary": "GET /projects/{project_id}/blueprints/{blueprint_id}",
+        "tags": [
+          "Project settings"
+        ]
       },
       "patch": {
         "operationId": "patchProjectsProjectIdBlueprintsBlueprintId",
@@ -9617,7 +9920,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/blueprints/{blueprint_id}"
+        "summary": "PATCH /projects/{project_id}/blueprints/{blueprint_id}",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/blueprints/{blueprint_id}/usage": {
@@ -9690,7 +9996,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/blueprints/{blueprint_id}/usage"
+        "summary": "GET /projects/{project_id}/blueprints/{blueprint_id}/usage",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/certificates": {
@@ -9755,7 +10064,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/certificates"
+        "summary": "GET /projects/{project_id}/certificates",
+        "tags": [
+          "Devices"
+        ]
       }
     },
     "/projects/{project_id}/certificates/{certificate_id}": {
@@ -9828,7 +10140,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/certificates/{certificate_id}"
+        "summary": "GET /projects/{project_id}/certificates/{certificate_id}",
+        "tags": [
+          "Devices"
+        ]
       }
     },
     "/projects/{project_id}/dashboards": {
@@ -9893,7 +10208,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/dashboards"
+        "summary": "GET /projects/{project_id}/dashboards",
+        "tags": [
+          "Observability & data"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdDashboards",
@@ -9973,7 +10291,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/dashboards"
+        "summary": "POST /projects/{project_id}/dashboards",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/dashboards/{dashboard_id}": {
@@ -10045,7 +10366,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/dashboards/{dashboard_id}"
+        "summary": "DELETE /projects/{project_id}/dashboards/{dashboard_id}",
+        "tags": [
+          "Observability & data"
+        ]
       },
       "patch": {
         "operationId": "patchProjectsProjectIdDashboardsDashboardId",
@@ -10133,7 +10457,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/dashboards/{dashboard_id}"
+        "summary": "PATCH /projects/{project_id}/dashboards/{dashboard_id}",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/dashboards/{dashboard_id}/panels": {
@@ -10206,7 +10533,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/dashboards/{dashboard_id}/panels"
+        "summary": "GET /projects/{project_id}/dashboards/{dashboard_id}/panels",
+        "tags": [
+          "Observability & data"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdDashboardsDashboardIdPanels",
@@ -10294,7 +10624,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/dashboards/{dashboard_id}/panels"
+        "summary": "POST /projects/{project_id}/dashboards/{dashboard_id}/panels",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}": {
@@ -10374,7 +10707,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}"
+        "summary": "DELETE /projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}",
+        "tags": [
+          "Observability & data"
+        ]
       },
       "patch": {
         "operationId": "patchProjectsProjectIdDashboardsDashboardIdPanelsDashboardPanelId",
@@ -10470,7 +10806,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}"
+        "summary": "PATCH /projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}/data": {
@@ -10551,7 +10890,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}/data"
+        "summary": "GET /projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}/data",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/data": {
@@ -10616,7 +10958,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/data"
+        "summary": "GET /projects/{project_id}/data",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/data-point-definitions": {
@@ -10681,7 +11026,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/data-point-definitions"
+        "summary": "GET /projects/{project_id}/data-point-definitions",
+        "tags": [
+          "Observability & data"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdDataPointDefinitions",
@@ -10761,7 +11109,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/data-point-definitions"
+        "summary": "POST /projects/{project_id}/data-point-definitions",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/data-point-definitions/{data_point_definition_id}": {
@@ -10833,7 +11184,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/data-point-definitions/{data_point_definition_id}"
+        "summary": "DELETE /projects/{project_id}/data-point-definitions/{data_point_definition_id}",
+        "tags": [
+          "Observability & data"
+        ]
       },
       "patch": {
         "operationId": "patchProjectsProjectIdDataPointDefinitionsDataPointDefinitionId",
@@ -10921,7 +11275,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/data-point-definitions/{data_point_definition_id}"
+        "summary": "PATCH /projects/{project_id}/data-point-definitions/{data_point_definition_id}",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/data-point-definitions/{data_point_definition_id}/data": {
@@ -10994,7 +11351,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/data-point-definitions/{data_point_definition_id}/data"
+        "summary": "GET /projects/{project_id}/data-point-definitions/{data_point_definition_id}/data",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/data-point-definitions/{data_point_definition_id}/download": {
@@ -11084,7 +11444,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/data-point-definitions/{data_point_definition_id}/download"
+        "summary": "POST /projects/{project_id}/data-point-definitions/{data_point_definition_id}/download",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/device_data_points": {
@@ -11149,7 +11512,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/device_data_points"
+        "summary": "GET /projects/{project_id}/device_data_points",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/devices": {
@@ -11214,7 +11580,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/devices"
+        "summary": "GET /projects/{project_id}/devices",
+        "tags": [
+          "Devices"
+        ]
       }
     },
     "/projects/{project_id}/devices/{device_id}/channels": {
@@ -11268,7 +11637,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List logical channels for a device"
+        "summary": "List logical channels for a device",
+        "tags": [
+          "Devices"
+        ]
       }
     },
     "/projects/{project_id}/devices/{device_id}/commands": {
@@ -11332,7 +11704,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Issue a generic device command (v3)"
+        "summary": "Issue a generic device command (v3)",
+        "tags": [
+          "Devices"
+        ]
       }
     },
     "/projects/{project_id}/devices/{device_id}/events": {
@@ -11405,7 +11780,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/devices/{device_id}/events"
+        "summary": "GET /projects/{project_id}/devices/{device_id}/events",
+        "tags": [
+          "Devices"
+        ]
       }
     },
     "/projects/{project_id}/devices/{device_id}/events/stream": {
@@ -11478,7 +11856,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/devices/{device_id}/events/stream"
+        "summary": "GET /projects/{project_id}/devices/{device_id}/events/stream",
+        "tags": [
+          "Devices"
+        ]
       }
     },
     "/projects/{project_id}/edge/coalesced-mirrors": {
@@ -11523,7 +11904,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List project-level coalesced mirror tables"
+        "summary": "List project-level coalesced mirror tables",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/coalesced-mirrors/{mirror_id}": {
@@ -11577,7 +11961,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a single coalesced mirror with its columns"
+        "summary": "Get a single coalesced mirror with its columns",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/coalesced-mirrors/{source_table}/consolidate": {
@@ -11645,7 +12032,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Phase 2 \u2014 copy per-device mirror rows into the shared coalesced mirror"
+        "summary": "Phase 2 \u2014 copy per-device mirror rows into the shared coalesced mirror",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/lineages": {
@@ -11695,7 +12085,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List edge table lineages for a project"
+        "summary": "List edge table lineages for a project",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/lineages/{lineage_id}": {
@@ -11767,7 +12160,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete edge sync state for a single table lineage"
+        "summary": "Delete edge sync state for a single table lineage",
+        "tags": [
+          "Edge replication"
+        ]
       },
       "get": {
         "operationId": "getEdgeTableLineage",
@@ -11839,7 +12235,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a single edge table lineage with schema versions and column bindings"
+        "summary": "Get a single edge table lineage with schema versions and column bindings",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/lineages/{lineage_id}/mirror-rows": {
@@ -11912,7 +12311,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/edge/lineages/{lineage_id}/mirror-rows"
+        "summary": "GET /projects/{project_id}/edge/lineages/{lineage_id}/mirror-rows",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/lineages/{lineage_id}/reset-materialization": {
@@ -11988,7 +12390,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Reset materialization failure state for an edge table lineage"
+        "summary": "Reset materialization failure state for an edge table lineage",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/lineages/{lineage_id}/staged-rows": {
@@ -12061,7 +12466,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/edge/lineages/{lineage_id}/staged-rows"
+        "summary": "GET /projects/{project_id}/edge/lineages/{lineage_id}/staged-rows",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/policy": {
@@ -12143,7 +12551,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/edge/policy"
+        "summary": "PATCH /projects/{project_id}/edge/policy",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/registry": {
@@ -12202,7 +12613,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List project-level edge schema registry entries"
+        "summary": "List project-level edge schema registry entries",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/registry-reviews": {
@@ -12261,7 +12675,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List project-level edge registry schema reviews"
+        "summary": "List project-level edge registry schema reviews",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/registry-reviews/{review_id}": {
@@ -12315,7 +12732,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a single edge registry schema review"
+        "summary": "Get a single edge registry schema review",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/registry-reviews/{review_id}/abandon": {
@@ -12369,7 +12789,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Abandon an edge registry schema review"
+        "summary": "Abandon an edge registry schema review",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/registry-reviews/{review_id}/approve": {
@@ -12448,7 +12871,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Approve an edge registry schema review with column binding actions"
+        "summary": "Approve an edge registry schema review with column binding actions",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/registry-reviews/{review_id}/claim": {
@@ -12502,7 +12928,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Claim an edge registry schema review (queued \u2192 in_review)"
+        "summary": "Claim an edge registry schema review (queued \u2192 in_review)",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/registry-reviews/{review_id}/reject": {
@@ -12574,7 +13003,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Reject an edge registry schema review"
+        "summary": "Reject an edge registry schema review",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/registry/{registry_id}": {
@@ -12628,7 +13060,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a single edge schema registry entry with column bindings"
+        "summary": "Get a single edge schema registry entry with column bindings",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/schema-reviews": {
@@ -12673,7 +13108,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List edge schema reviews for a project"
+        "summary": "List edge schema reviews for a project",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/schema-reviews/{review_id}": {
@@ -12727,7 +13165,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a single edge schema review"
+        "summary": "Get a single edge schema review",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/schema-reviews/{review_id}/approve": {
@@ -12835,7 +13276,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Approve an edge schema review with column binding actions"
+        "summary": "Approve an edge schema review with column binding actions",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/schema-reviews/{review_id}/claim": {
@@ -12889,7 +13333,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Claim an edge schema review (queued \u2192 in_review)"
+        "summary": "Claim an edge schema review (queued \u2192 in_review)",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/edge/schema-reviews/{review_id}/reject": {
@@ -12961,7 +13408,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Reject an edge schema review; staged rows are discarded"
+        "summary": "Reject an edge schema review; staged rows are discarded",
+        "tags": [
+          "Edge replication"
+        ]
       }
     },
     "/projects/{project_id}/environments": {
@@ -13026,7 +13476,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/environments"
+        "summary": "GET /projects/{project_id}/environments",
+        "tags": [
+          "Project settings"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdEnvironments",
@@ -13106,7 +13559,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/environments"
+        "summary": "POST /projects/{project_id}/environments",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/environments/{env_id}": {
@@ -13178,7 +13634,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/environments/{env_id}"
+        "summary": "DELETE /projects/{project_id}/environments/{env_id}",
+        "tags": [
+          "Project settings"
+        ]
       },
       "get": {
         "operationId": "getProjectsProjectIdEnvironmentsEnvId",
@@ -13249,7 +13708,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/environments/{env_id}"
+        "summary": "GET /projects/{project_id}/environments/{env_id}",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/environments/{env_id}/secrets": {
@@ -13339,7 +13801,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PUT /projects/{project_id}/environments/{env_id}/secrets"
+        "summary": "PUT /projects/{project_id}/environments/{env_id}/secrets",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/environments/{env_id}/secrets/{key}": {
@@ -13419,7 +13884,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/environments/{env_id}/secrets/{key}"
+        "summary": "DELETE /projects/{project_id}/environments/{env_id}/secrets/{key}",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/environments/{env_id}/variables": {
@@ -13509,7 +13977,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PUT /projects/{project_id}/environments/{env_id}/variables"
+        "summary": "PUT /projects/{project_id}/environments/{env_id}/variables",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/environments/{env_id}/variables/{key}": {
@@ -13589,7 +14060,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/environments/{env_id}/variables/{key}"
+        "summary": "DELETE /projects/{project_id}/environments/{env_id}/variables/{key}",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/events": {
@@ -13714,7 +14188,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Keyset-paginated canonical event feed for a project."
+        "summary": "Keyset-paginated canonical event feed for a project.",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/events/correlation/{correlation_id}": {
@@ -13788,7 +14265,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List canonical events sharing a correlation_id."
+        "summary": "List canonical events sharing a correlation_id.",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/events/stream": {
@@ -13833,7 +14313,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "SSE real-time stream of canonical events for a project."
+        "summary": "SSE real-time stream of canonical events for a project.",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/events/{event_id}": {
@@ -13907,7 +14390,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a single canonical event by ID."
+        "summary": "Get a single canonical event by ID.",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/features": {
@@ -13994,7 +14480,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List project features"
+        "summary": "List project features",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/fleets": {
@@ -14059,7 +14548,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/fleets"
+        "summary": "GET /projects/{project_id}/fleets",
+        "tags": [
+          "Fleets"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdFleets",
@@ -14139,7 +14631,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/fleets"
+        "summary": "POST /projects/{project_id}/fleets",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}": {
@@ -14211,7 +14706,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/fleets/{fleet_id}"
+        "summary": "DELETE /projects/{project_id}/fleets/{fleet_id}",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/bootstrap-certs": {
@@ -14255,7 +14753,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List bootstrap certificates for a fleet"
+        "summary": "List bootstrap certificates for a fleet",
+        "tags": [
+          "Fleets"
+        ]
       },
       "post": {
         "operationId": "issueFleetBootstrapCert",
@@ -14333,7 +14834,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Issue a fleet bootstrap certificate for JITR/JITP provisioning"
+        "summary": "Issue a fleet bootstrap certificate for JITR/JITP provisioning",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/bootstrap-certs/{serial}": {
@@ -14406,7 +14910,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Revoke a fleet bootstrap certificate by serial number"
+        "summary": "Revoke a fleet bootstrap certificate by serial number",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices": {
@@ -14479,7 +14986,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/devices"
+        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/devices",
+        "tags": [
+          "Fleets"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdFleetsFleetIdDevices",
@@ -14567,7 +15077,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/devices"
+        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/devices",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/bulk": {
@@ -14657,7 +15170,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/devices/bulk"
+        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/devices/bulk",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}": {
@@ -14737,7 +15253,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}"
+        "summary": "DELETE /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}",
+        "tags": [
+          "Fleets"
+        ]
       },
       "patch": {
         "operationId": "patchProjectsProjectIdFleetsFleetIdDevicesDeviceId",
@@ -14833,7 +15352,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}"
+        "summary": "PATCH /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/data_points": {
@@ -14914,7 +15436,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/data_points"
+        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/data_points",
+        "tags": [
+          "Fleets"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdFleetsFleetIdDevicesDeviceIdDataPoints",
@@ -15010,7 +15535,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/data_points"
+        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/data_points",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/data_points/{device_data_point_id}": {
@@ -15098,7 +15626,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/data_points/{device_data_point_id}"
+        "summary": "DELETE /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/data_points/{device_data_point_id}",
+        "tags": [
+          "Fleets"
+        ]
       },
       "patch": {
         "operationId": "patchProjectsProjectIdFleetsFleetIdDevicesDeviceIdDataPointsDeviceDataPointId",
@@ -15202,7 +15733,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/data_points/{device_data_point_id}"
+        "summary": "PATCH /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/data_points/{device_data_point_id}",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/enroll": {
@@ -15300,7 +15834,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Enroll a device into its fleet's integration namespace (operator surface \u2014 no account_id required)"
+        "summary": "Enroll a device into its fleet's integration namespace (operator surface \u2014 no account_id required)",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/events": {
@@ -15390,7 +15927,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Keyset-paginated canonical event feed scoped to a device."
+        "summary": "Keyset-paginated canonical event feed scoped to a device.",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/events/stream": {
@@ -15471,7 +16011,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/events/stream"
+        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/events/stream",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/integrations/bindings": {
@@ -15549,7 +16092,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List integration bindings for a device"
+        "summary": "List integration bindings for a device",
+        "tags": [
+          "Fleets"
+        ]
       },
       "post": {
         "operationId": "createDeviceIntegrationBinding",
@@ -15621,7 +16167,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create an integration binding for a device"
+        "summary": "Create an integration binding for a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/integrations/bindings/{binding_id}": {
@@ -15693,7 +16242,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a device-level integration binding"
+        "summary": "Delete a device-level integration binding",
+        "tags": [
+          "Fleets"
+        ]
       },
       "patch": {
         "operationId": "patchDeviceIntegrationBinding",
@@ -15774,7 +16326,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update a device-level integration binding"
+        "summary": "Update a device-level integration binding",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/integrations/effective": {
@@ -15837,7 +16392,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get effective integration bindings for a device"
+        "summary": "Get effective integration bindings for a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/integrations/enrollments": {
@@ -15915,7 +16473,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List integration enrollments for a device"
+        "summary": "List integration enrollments for a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/integrations/links": {
@@ -15993,7 +16554,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List integration links for a device"
+        "summary": "List integration links for a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/integrations/subsume": {
@@ -16067,7 +16631,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Subsume an external device into a fleet device"
+        "summary": "Subsume an external device into a fleet device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/integrations/{integration_type}/downlinks": {
@@ -16153,7 +16720,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List downlinks for a device"
+        "summary": "List downlinks for a device",
+        "tags": [
+          "Fleets"
+        ]
       },
       "post": {
         "operationId": "enqueueDeviceDownlink",
@@ -16233,7 +16803,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Enqueue a LoRaWAN downlink for a device"
+        "summary": "Enqueue a LoRaWAN downlink for a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/integrations/{integration_type}/downlinks/{downlink_id}": {
@@ -16313,7 +16886,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a specific device downlink"
+        "summary": "Get a specific device downlink",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/mdm/applied_state": {
@@ -16376,7 +16952,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get the MDM applied policy state for a device"
+        "summary": "Get the MDM applied policy state for a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/mdm/commands": {
@@ -16439,7 +17018,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List MDM commands for a device"
+        "summary": "List MDM commands for a device",
+        "tags": [
+          "Fleets"
+        ]
       },
       "post": {
         "operationId": "issueMDMCommand",
@@ -16511,7 +17093,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Issue an MDM command to a device"
+        "summary": "Issue an MDM command to a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/mdm/commands/{command_id}": {
@@ -16583,7 +17168,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a specific MDM command"
+        "summary": "Get a specific MDM command",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/mqtt_certificate": {
@@ -16697,7 +17285,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Issue an MQTT TLS client certificate for a device"
+        "summary": "Issue an MQTT TLS client certificate for a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/mqtt_connection_details": {
@@ -16791,7 +17382,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get MQTT broker connection details for a device"
+        "summary": "Get MQTT broker connection details for a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/realtime-session": {
@@ -16865,7 +17459,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Start a realtime session for a device"
+        "summary": "Start a realtime session for a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/realtime-sessions": {
@@ -16928,7 +17525,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List realtime sessions for a device"
+        "summary": "List realtime sessions for a device",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/tags": {
@@ -17008,7 +17608,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/tags"
+        "summary": "DELETE /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/tags",
+        "tags": [
+          "Fleets"
+        ]
       },
       "get": {
         "operationId": "getProjectsProjectIdFleetsFleetIdDevicesDeviceIdTags",
@@ -17087,7 +17690,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/tags"
+        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/tags",
+        "tags": [
+          "Fleets"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdFleetsFleetIdDevicesDeviceIdTags",
@@ -17183,7 +17789,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/tags"
+        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/tags",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/tags_by_name": {
@@ -17281,7 +17890,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/tags_by_name"
+        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/devices/{device_id}/tags_by_name",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/discover": {
@@ -17361,7 +17973,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Trigger device discovery for a fleet (operator surface \u2014 no account_id required)"
+        "summary": "Trigger device discovery for a fleet (operator surface \u2014 no account_id required)",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/coalesced-mirrors": {
@@ -17415,7 +18030,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List fleet-scoped coalesced mirror tables"
+        "summary": "List fleet-scoped coalesced mirror tables",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/coalesced-mirrors/{mirror_id}": {
@@ -17478,7 +18096,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a single fleet-scoped coalesced mirror with its columns"
+        "summary": "Get a single fleet-scoped coalesced mirror with its columns",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/policy": {
@@ -17568,7 +18189,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/fleets/{fleet_id}/edge/policy"
+        "summary": "PATCH /projects/{project_id}/fleets/{fleet_id}/edge/policy",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/registry": {
@@ -17622,7 +18246,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List fleet-scoped schema registry entries"
+        "summary": "List fleet-scoped schema registry entries",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/registry-reviews": {
@@ -17676,7 +18303,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List fleet-scoped registry schema reviews"
+        "summary": "List fleet-scoped registry schema reviews",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/registry-reviews/{review_id}": {
@@ -17739,7 +18369,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a single fleet-scoped registry schema review"
+        "summary": "Get a single fleet-scoped registry schema review",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/registry-reviews/{review_id}/abandon": {
@@ -17802,7 +18435,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Abandon a fleet-scoped registry review"
+        "summary": "Abandon a fleet-scoped registry review",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/registry-reviews/{review_id}/approve": {
@@ -17875,7 +18511,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Approve a fleet-scoped registry review with column binding actions"
+        "summary": "Approve a fleet-scoped registry review with column binding actions",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/registry-reviews/{review_id}/claim": {
@@ -17938,7 +18577,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Claim a fleet-scoped registry review (queued \u2192 in_review)"
+        "summary": "Claim a fleet-scoped registry review (queued \u2192 in_review)",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/registry-reviews/{review_id}/reject": {
@@ -18011,7 +18653,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Reject a fleet-scoped registry review"
+        "summary": "Reject a fleet-scoped registry review",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/registry/{registry_id}": {
@@ -18074,7 +18719,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a single fleet-scoped registry entry with column bindings"
+        "summary": "Get a single fleet-scoped registry entry with column bindings",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/events": {
@@ -18155,7 +18803,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Keyset-paginated canonical event feed scoped to a fleet."
+        "summary": "Keyset-paginated canonical event feed scoped to a fleet.",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/integrations/bindings": {
@@ -18224,7 +18875,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List integration bindings for a fleet"
+        "summary": "List integration bindings for a fleet",
+        "tags": [
+          "Fleets"
+        ]
       },
       "post": {
         "operationId": "createFleetIntegrationBinding",
@@ -18287,7 +18941,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create an integration binding for a fleet"
+        "summary": "Create an integration binding for a fleet",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/integrations/bindings/{binding_id}": {
@@ -18350,7 +19007,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a fleet-level integration binding"
+        "summary": "Delete a fleet-level integration binding",
+        "tags": [
+          "Fleets"
+        ]
       },
       "patch": {
         "operationId": "patchFleetIntegrationBinding",
@@ -18422,7 +19082,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update a fleet-level integration binding"
+        "summary": "Update a fleet-level integration binding",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/stats": {
@@ -18495,7 +19158,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/stats"
+        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/stats",
+        "tags": [
+          "Fleets"
+        ]
       }
     },
     "/projects/{project_id}/gateways": {
@@ -18560,7 +19226,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/gateways"
+        "summary": "GET /projects/{project_id}/gateways",
+        "tags": [
+          "Project settings"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdGateways",
@@ -18640,7 +19309,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/gateways"
+        "summary": "POST /projects/{project_id}/gateways",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/gateways/{gateway_id}": {
@@ -18712,7 +19384,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/gateways/{gateway_id}"
+        "summary": "DELETE /projects/{project_id}/gateways/{gateway_id}",
+        "tags": [
+          "Project settings"
+        ]
       },
       "get": {
         "operationId": "getProjectsProjectIdGatewaysGatewayId",
@@ -18783,7 +19458,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/gateways/{gateway_id}"
+        "summary": "GET /projects/{project_id}/gateways/{gateway_id}",
+        "tags": [
+          "Project settings"
+        ]
       },
       "put": {
         "operationId": "putProjectsProjectIdGatewaysGatewayId",
@@ -18871,7 +19549,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PUT /projects/{project_id}/gateways/{gateway_id}"
+        "summary": "PUT /projects/{project_id}/gateways/{gateway_id}",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/gateways/{gateway_id}/certificates": {
@@ -18961,7 +19642,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/gateways/{gateway_id}/certificates"
+        "summary": "POST /projects/{project_id}/gateways/{gateway_id}/certificates",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/gateways/{gateway_id}/frames": {
@@ -19034,7 +19718,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/gateways/{gateway_id}/frames"
+        "summary": "GET /projects/{project_id}/gateways/{gateway_id}/frames",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/integrations/bindings": {
@@ -19094,7 +19781,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List integration bindings for a project"
+        "summary": "List integration bindings for a project",
+        "tags": [
+          "Integrations"
+        ]
       },
       "post": {
         "operationId": "createProjectIntegrationBinding",
@@ -19148,7 +19838,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create an integration binding for a project"
+        "summary": "Create an integration binding for a project",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/integrations/bindings/{binding_id}": {
@@ -19202,7 +19895,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a project-level integration binding"
+        "summary": "Delete a project-level integration binding",
+        "tags": [
+          "Integrations"
+        ]
       },
       "patch": {
         "operationId": "patchProjectIntegrationBinding",
@@ -19265,7 +19961,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update a project-level integration binding"
+        "summary": "Update a project-level integration binding",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/integrations/pending": {
@@ -19328,7 +20027,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List pending subsume items for a project"
+        "summary": "List pending subsume items for a project",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/integrations/pending/{ref_id}/approve": {
@@ -19393,7 +20095,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Approve a pending subsume item"
+        "summary": "Approve a pending subsume item",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/integrations/pending/{ref_id}/reject": {
@@ -19447,7 +20152,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Reject a pending subsume item"
+        "summary": "Reject a pending subsume item",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/locations": {
@@ -19521,7 +20229,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Device map markers in a bounding box (requires project member)."
+        "summary": "Device map markers in a bounding box (requires project member).",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/logs": {
@@ -19651,7 +20362,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Paginated TSDB logs for a project (requires can_read_logs)."
+        "summary": "Paginated TSDB logs for a project (requires can_read_logs).",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/mdm/assignments/{assignment_id}": {
@@ -19705,7 +20419,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete an MDM policy assignment"
+        "summary": "Delete an MDM policy assignment",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/devices/{device_id}/commands": {
@@ -19759,7 +20476,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List MDM commands for a device"
+        "summary": "List MDM commands for a device",
+        "tags": [
+          "MDM"
+        ]
       },
       "post": {
         "operationId": "createProjectMdmDeviceCommand",
@@ -19822,7 +20542,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Queue an MDM command for a device"
+        "summary": "Queue an MDM command for a device",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/devices/{device_id}/commands/{command_id}": {
@@ -19885,7 +20608,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get MDM command status for a device"
+        "summary": "Get MDM command status for a device",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/policies": {
@@ -19930,7 +20656,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List MDM policies for a project"
+        "summary": "List MDM policies for a project",
+        "tags": [
+          "MDM"
+        ]
       },
       "post": {
         "operationId": "createMDMPolicy",
@@ -19984,7 +20713,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create an MDM policy"
+        "summary": "Create an MDM policy",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/policies/{policy_id}": {
@@ -20038,7 +20770,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete an MDM policy"
+        "summary": "Delete an MDM policy",
+        "tags": [
+          "MDM"
+        ]
       },
       "get": {
         "operationId": "getMDMPolicy",
@@ -20090,7 +20825,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get an MDM policy"
+        "summary": "Get an MDM policy",
+        "tags": [
+          "MDM"
+        ]
       },
       "patch": {
         "operationId": "patchMDMPolicy",
@@ -20153,7 +20891,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update an MDM policy"
+        "summary": "Update an MDM policy",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/policies/{policy_id}/assign": {
@@ -20218,7 +20959,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Assign an MDM policy to a fleet"
+        "summary": "Assign an MDM policy to a fleet",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/policies/{policy_id}/assign/{assignment_id}": {
@@ -20281,7 +21025,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Remove an MDM policy assignment"
+        "summary": "Remove an MDM policy assignment",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/rollouts": {
@@ -20326,7 +21073,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List MDM rollouts for a project"
+        "summary": "List MDM rollouts for a project",
+        "tags": [
+          "MDM"
+        ]
       },
       "post": {
         "operationId": "createMDMRollout",
@@ -20380,7 +21130,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create an MDM rollout"
+        "summary": "Create an MDM rollout",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/rollouts/{rollout_id}": {
@@ -20434,7 +21187,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get an MDM rollout"
+        "summary": "Get an MDM rollout",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/rollouts/{rollout_id}/cancel": {
@@ -20499,7 +21255,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Cancel an MDM rollout"
+        "summary": "Cancel an MDM rollout",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/rollouts/{rollout_id}/pause": {
@@ -20564,7 +21323,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Pause an MDM rollout"
+        "summary": "Pause an MDM rollout",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mdm/rollouts/{rollout_id}/resume": {
@@ -20629,7 +21391,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Resume a paused MDM rollout"
+        "summary": "Resume a paused MDM rollout",
+        "tags": [
+          "MDM"
+        ]
       }
     },
     "/projects/{project_id}/mqtt-access-events": {
@@ -20736,7 +21501,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Paginated MQTT broker access diagnostics (requires can_read_logs)."
+        "summary": "Paginated MQTT broker access diagnostics (requires can_read_logs).",
+        "tags": [
+          "Devices"
+        ]
       }
     },
     "/projects/{project_id}/ota/releases": {
@@ -20836,7 +21604,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/ota/releases"
+        "summary": "GET /projects/{project_id}/ota/releases",
+        "tags": [
+          "OTA"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdOtaReleases",
@@ -20916,7 +21687,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/ota/releases"
+        "summary": "POST /projects/{project_id}/ota/releases",
+        "tags": [
+          "OTA"
+        ]
       }
     },
     "/projects/{project_id}/ota/releases/{release_id}": {
@@ -20988,7 +21762,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/ota/releases/{release_id}"
+        "summary": "DELETE /projects/{project_id}/ota/releases/{release_id}",
+        "tags": [
+          "OTA"
+        ]
       },
       "get": {
         "operationId": "getProjectsProjectIdOtaReleasesReleaseId",
@@ -21068,7 +21845,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/ota/releases/{release_id}"
+        "summary": "GET /projects/{project_id}/ota/releases/{release_id}",
+        "tags": [
+          "OTA"
+        ]
       }
     },
     "/projects/{project_id}/ota/releases/{release_id}/artifacts": {
@@ -21183,7 +21963,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/ota/releases/{release_id}/artifacts"
+        "summary": "GET /projects/{project_id}/ota/releases/{release_id}/artifacts",
+        "tags": [
+          "OTA"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdOtaReleasesReleaseIdArtifacts",
@@ -21271,7 +22054,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/ota/releases/{release_id}/artifacts"
+        "summary": "POST /projects/{project_id}/ota/releases/{release_id}/artifacts",
+        "tags": [
+          "OTA"
+        ]
       }
     },
     "/projects/{project_id}/ota/releases/{release_id}/artifacts/{artifact_id}": {
@@ -21351,7 +22137,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/ota/releases/{release_id}/artifacts/{artifact_id}"
+        "summary": "DELETE /projects/{project_id}/ota/releases/{release_id}/artifacts/{artifact_id}",
+        "tags": [
+          "OTA"
+        ]
       },
       "get": {
         "operationId": "getProjectsProjectIdOtaReleasesReleaseIdArtifactsArtifactId",
@@ -21439,7 +22228,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/ota/releases/{release_id}/artifacts/{artifact_id}"
+        "summary": "GET /projects/{project_id}/ota/releases/{release_id}/artifacts/{artifact_id}",
+        "tags": [
+          "OTA"
+        ]
       }
     },
     "/projects/{project_id}/ota/releases/{release_id}/deployments": {
@@ -21555,7 +22347,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/ota/releases/{release_id}/deployments"
+        "summary": "GET /projects/{project_id}/ota/releases/{release_id}/deployments",
+        "tags": [
+          "OTA"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdOtaReleasesReleaseIdDeployments",
@@ -21643,7 +22438,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/ota/releases/{release_id}/deployments"
+        "summary": "POST /projects/{project_id}/ota/releases/{release_id}/deployments",
+        "tags": [
+          "OTA"
+        ]
       }
     },
     "/projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}": {
@@ -21723,7 +22521,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}"
+        "summary": "DELETE /projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}",
+        "tags": [
+          "OTA"
+        ]
       },
       "get": {
         "operationId": "getProjectsProjectIdOtaReleasesReleaseIdDeploymentsDeploymentId",
@@ -21811,7 +22612,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}"
+        "summary": "GET /projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}",
+        "tags": [
+          "OTA"
+        ]
       },
       "patch": {
         "operationId": "patchProjectsProjectIdOtaReleasesReleaseIdDeploymentsDeploymentId",
@@ -21907,7 +22711,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}"
+        "summary": "PATCH /projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}",
+        "tags": [
+          "OTA"
+        ]
       }
     },
     "/projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}/cancel": {
@@ -22005,7 +22812,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}/cancel"
+        "summary": "POST /projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}/cancel",
+        "tags": [
+          "OTA"
+        ]
       }
     },
     "/projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}/events": {
@@ -22102,7 +22912,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List canonical events for an OTA deployment."
+        "summary": "List canonical events for an OTA deployment.",
+        "tags": [
+          "OTA"
+        ]
       }
     },
     "/projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}/events/stream": {
@@ -22173,7 +22986,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "SSE real-time stream of canonical events for an OTA deployment."
+        "summary": "SSE real-time stream of canonical events for an OTA deployment.",
+        "tags": [
+          "OTA"
+        ]
       }
     },
     "/projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}/trigger": {
@@ -22271,7 +23087,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}/trigger"
+        "summary": "POST /projects/{project_id}/ota/releases/{release_id}/deployments/{deployment_id}/trigger",
+        "tags": [
+          "OTA"
+        ]
       }
     },
     "/projects/{project_id}/plugin/endpoints": {
@@ -22316,7 +23135,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List plugin HTTP endpoints (v3)"
+        "summary": "List plugin HTTP endpoints (v3)",
+        "tags": [
+          "Integrations"
+        ]
       },
       "post": {
         "operationId": "createProjectPluginEndpointV3",
@@ -22370,7 +23192,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create a plugin HTTP endpoint (v3)"
+        "summary": "Create a plugin HTTP endpoint (v3)",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugin/endpoints/{endpoint_id}": {
@@ -22424,7 +23249,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a plugin HTTP endpoint (v3)"
+        "summary": "Delete a plugin HTTP endpoint (v3)",
+        "tags": [
+          "Integrations"
+        ]
       },
       "get": {
         "operationId": "getProjectPluginEndpointV3",
@@ -22476,7 +23304,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a plugin HTTP endpoint (v3)"
+        "summary": "Get a plugin HTTP endpoint (v3)",
+        "tags": [
+          "Integrations"
+        ]
       },
       "patch": {
         "operationId": "patchProjectPluginEndpointV3",
@@ -22539,7 +23370,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update a plugin HTTP endpoint (v3)"
+        "summary": "Update a plugin HTTP endpoint (v3)",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugin/endpoints/{endpoint_id}/service-accounts": {
@@ -22604,7 +23438,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create a service account for a plugin endpoint (v3)"
+        "summary": "Create a service account for a plugin endpoint (v3)",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugin/endpoints/{endpoint_id}/service-accounts/{sa_id}": {
@@ -22667,7 +23504,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a plugin endpoint service account (v3)"
+        "summary": "Delete a plugin endpoint service account (v3)",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugin/endpoints/{endpoint_id}/service-accounts/{sa_id}/rotate-key": {
@@ -22741,7 +23581,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Rotate API key for a plugin endpoint service account (v3)"
+        "summary": "Rotate API key for a plugin endpoint service account (v3)",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugin/endpoints/{endpoint_id}/test": {
@@ -22806,7 +23649,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Send a test request through a plugin endpoint (v3)"
+        "summary": "Send a test request through a plugin endpoint (v3)",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugins/endpoints": {
@@ -22851,7 +23697,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List plugin endpoints for a project"
+        "summary": "List plugin endpoints for a project",
+        "tags": [
+          "Integrations"
+        ]
       },
       "post": {
         "operationId": "createPluginEndpoint",
@@ -22905,7 +23754,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create a plugin endpoint"
+        "summary": "Create a plugin endpoint",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugins/endpoints/{endpoint_id}": {
@@ -22959,7 +23811,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a plugin endpoint"
+        "summary": "Delete a plugin endpoint",
+        "tags": [
+          "Integrations"
+        ]
       },
       "get": {
         "operationId": "getPluginEndpoint",
@@ -23011,7 +23866,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a plugin endpoint"
+        "summary": "Get a plugin endpoint",
+        "tags": [
+          "Integrations"
+        ]
       },
       "patch": {
         "operationId": "patchPluginEndpoint",
@@ -23074,7 +23932,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update a plugin endpoint"
+        "summary": "Update a plugin endpoint",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugins/endpoints/{endpoint_id}/log": {
@@ -23128,7 +23989,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get log for a plugin endpoint"
+        "summary": "Get log for a plugin endpoint",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugins/endpoints/{endpoint_id}/test": {
@@ -23182,7 +24046,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Test a plugin endpoint"
+        "summary": "Test a plugin endpoint",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugins/service_accounts": {
@@ -23238,7 +24105,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create a service account for a plugin endpoint"
+        "summary": "Create a service account for a plugin endpoint",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/plugins/service_accounts/{service_account_id}": {
@@ -23292,7 +24162,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a plugin service account"
+        "summary": "Delete a plugin service account",
+        "tags": [
+          "Integrations"
+        ]
       }
     },
     "/projects/{project_id}/properties": {
@@ -23357,7 +24230,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/properties"
+        "summary": "GET /projects/{project_id}/properties",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/properties/{property}": {
@@ -23447,7 +24323,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/properties/{property}"
+        "summary": "PATCH /projects/{project_id}/properties/{property}",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/queryscript": {
@@ -23545,7 +24424,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Execute QueryScript against project TSDB data"
+        "summary": "Execute QueryScript against project TSDB data",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/queryscript/export": {
@@ -23663,7 +24545,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Export QueryScript results as a zstd-compressed Arrow IPC stream"
+        "summary": "Export QueryScript results as a zstd-compressed Arrow IPC stream",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/realtime-sessions/{session_id}": {
@@ -23716,7 +24601,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get realtime session details"
+        "summary": "Get realtime session details",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/realtime-sessions/{session_id}/end": {
@@ -23781,7 +24669,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "End an active realtime session"
+        "summary": "End an active realtime session",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/realtime-sessions/{session_id}/join": {
@@ -23846,7 +24737,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Join an existing realtime session"
+        "summary": "Join an existing realtime session",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/search": {
@@ -23944,7 +24838,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Search project entities"
+        "summary": "Search project entities",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/shadow-definitions": {
@@ -24009,7 +24906,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/shadow-definitions"
+        "summary": "GET /projects/{project_id}/shadow-definitions",
+        "tags": [
+          "Observability & data"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdShadowDefinitions",
@@ -24089,7 +24989,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/shadow-definitions"
+        "summary": "POST /projects/{project_id}/shadow-definitions",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/shadow-definitions/{shadow_definition_id}": {
@@ -24179,7 +25082,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/shadow-definitions/{shadow_definition_id}"
+        "summary": "PATCH /projects/{project_id}/shadow-definitions/{shadow_definition_id}",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/stats": {
@@ -24234,7 +25140,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get PostgreSQL-backed project stats"
+        "summary": "Get PostgreSQL-backed project stats",
+        "tags": [
+          "Observability & data"
+        ]
       }
     },
     "/projects/{project_id}/status": {
@@ -24383,7 +25292,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Devices in the project with connectivity and metadata filters (paginated, authorized read)."
+        "summary": "Devices in the project with connectivity and metadata filters (paginated, authorized read).",
+        "tags": [
+          "Projects \u2014 Status"
+        ]
       }
     },
     "/projects/{project_id}/tags": {
@@ -24448,7 +25360,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/tags"
+        "summary": "GET /projects/{project_id}/tags",
+        "tags": [
+          "Project settings"
+        ]
       },
       "post": {
         "operationId": "postProjectsProjectIdTags",
@@ -24528,7 +25443,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/tags"
+        "summary": "POST /projects/{project_id}/tags",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/tags/{tag_id}": {
@@ -24600,7 +25518,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "DELETE /projects/{project_id}/tags/{tag_id}"
+        "summary": "DELETE /projects/{project_id}/tags/{tag_id}",
+        "tags": [
+          "Project settings"
+        ]
       },
       "patch": {
         "operationId": "patchProjectsProjectIdTagsTagId",
@@ -24688,7 +25609,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/tags/{tag_id}"
+        "summary": "PATCH /projects/{project_id}/tags/{tag_id}",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/tags/{tag_id}/devices": {
@@ -24761,7 +25685,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/tags/{tag_id}/devices"
+        "summary": "GET /projects/{project_id}/tags/{tag_id}/devices",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/tags/{tag_id}/physical_assets": {
@@ -24834,7 +25761,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/tags/{tag_id}/physical_assets"
+        "summary": "GET /projects/{project_id}/tags/{tag_id}/physical_assets",
+        "tags": [
+          "Project settings"
+        ]
       }
     },
     "/projects/{project_id}/ticket-forms": {
@@ -24911,7 +25841,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List ticket form definitions for a project"
+        "summary": "List ticket form definitions for a project",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "post": {
         "operationId": "createProjectTicketForm",
@@ -24984,7 +25917,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create a project-scoped ticket form definition (YAML in, JSON stored)"
+        "summary": "Create a project-scoped ticket form definition (YAML in, JSON stored)",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/ticket-forms/{form_id}": {
@@ -25058,7 +25994,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a ticket form definition row"
+        "summary": "Delete a ticket form definition row",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "get": {
         "operationId": "getProjectTicketForm",
@@ -25130,7 +26069,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a ticket form definition by id"
+        "summary": "Get a ticket form definition by id",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "patch": {
         "operationId": "patchProjectTicketForm",
@@ -25222,7 +26164,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Add next form version from YAML (name must match)"
+        "summary": "Add next form version from YAML (name must match)",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/ticket-workflows": {
@@ -25299,7 +26244,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List ticket workflow versions for a project"
+        "summary": "List ticket workflow versions for a project",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "post": {
         "operationId": "createProjectTicketWorkflow",
@@ -25372,7 +26320,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create a ticket workflow from JSON"
+        "summary": "Create a ticket workflow from JSON",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/ticket-workflows/{workflow_id}": {
@@ -25456,7 +26407,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete an inactive workflow version (no tickets referencing)"
+        "summary": "Delete an inactive workflow version (no tickets referencing)",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "get": {
         "operationId": "getProjectTicketWorkflow",
@@ -25528,7 +26482,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a ticket workflow version by id"
+        "summary": "Get a ticket workflow version by id",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "patch": {
         "operationId": "patchProjectTicketWorkflow",
@@ -25620,7 +26577,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Add next workflow version from JSON (name must match)"
+        "summary": "Add next workflow version from JSON (name must match)",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/ticket-workflows/{workflow_id}/activate": {
@@ -25684,7 +26644,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Activate a ticket workflow version"
+        "summary": "Activate a ticket workflow version",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/tickets": {
@@ -25851,7 +26814,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List tickets for a project"
+        "summary": "List tickets for a project",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "post": {
         "operationId": "createProjectTicket",
@@ -25924,7 +26890,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create a ticket"
+        "summary": "Create a ticket",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/tickets/{ticket_id}": {
@@ -25998,7 +26967,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a ticket"
+        "summary": "Delete a ticket",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "get": {
         "operationId": "getProjectTicket",
@@ -26070,7 +27042,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a ticket"
+        "summary": "Get a ticket",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "patch": {
         "operationId": "patchProjectTicket",
@@ -26162,7 +27137,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Patch ticket fields (title, body, metadata merge)"
+        "summary": "Patch ticket fields (title, body, metadata merge)",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/tickets/{ticket_id}/tags": {
@@ -26246,7 +27224,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Add a ticket tag"
+        "summary": "Add a ticket tag",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/tickets/{ticket_id}/transition": {
@@ -26330,7 +27311,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Transition a ticket"
+        "summary": "Transition a ticket",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/workflows": {
@@ -26375,7 +27359,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List workflows for a project"
+        "summary": "List workflows for a project",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "post": {
         "operationId": "createProjectWorkflow",
@@ -26429,7 +27416,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create a tenant workflow"
+        "summary": "Create a tenant workflow",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/workflows/{workflow_id}": {
@@ -26483,7 +27473,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Delete a tenant workflow"
+        "summary": "Delete a tenant workflow",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "get": {
         "operationId": "getProjectWorkflow",
@@ -26535,7 +27528,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Get a tenant workflow"
+        "summary": "Get a tenant workflow",
+        "tags": [
+          "Tickets & workflows"
+        ]
       },
       "patch": {
         "operationId": "patchProjectWorkflow",
@@ -26598,7 +27594,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Update a tenant workflow"
+        "summary": "Update a tenant workflow",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/projects/{project_id}/workflows/{workflow_id}/test": {
@@ -26663,7 +27662,10 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Test a tenant workflow with a sample event"
+        "summary": "Test a tenant workflow with a sample event",
+        "tags": [
+          "Tickets & workflows"
+        ]
       }
     },
     "/webhooks/pubsub": {
@@ -26693,7 +27695,10 @@
           }
         },
         "security": [],
-        "summary": "Google Pub/Sub push endpoint for integration webhooks"
+        "summary": "Google Pub/Sub push endpoint for integration webhooks",
+        "tags": [
+          "Webhooks"
+        ]
       }
     },
     "/webhooks/{provider_kind}/{account_id}": {
@@ -26742,7 +27747,10 @@
           }
         },
         "security": [],
-        "summary": "Inbound webhook for an integration provider account"
+        "summary": "Inbound webhook for an integration provider account",
+        "tags": [
+          "Webhooks"
+        ]
       }
     }
   },
@@ -26759,6 +27767,56 @@
     {
       "url": "http://localhost:19090/core/api/v1",
       "description": "Local vm-edge / dev"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Certificates (HTTP)"
+    },
+    {
+      "name": "Device JITR"
+    },
+    {
+      "name": "Devices"
+    },
+    {
+      "name": "Edge replication"
+    },
+    {
+      "name": "Fleets"
+    },
+    {
+      "name": "Integrations"
+    },
+    {
+      "name": "MDM"
+    },
+    {
+      "name": "OTA"
+    },
+    {
+      "name": "Observability & data"
+    },
+    {
+      "name": "Organizations"
+    },
+    {
+      "name": "Project settings"
+    },
+    {
+      "name": "Projects"
+    },
+    {
+      "name": "Projects \u2014 Status"
+    },
+    {
+      "name": "System"
+    },
+    {
+      "name": "Tickets & workflows"
+    },
+    {
+      "name": "Webhooks"
     }
   ]
 }
