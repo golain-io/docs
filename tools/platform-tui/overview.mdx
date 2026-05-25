@@ -1,32 +1,48 @@
 ---
-title: Platform CLI overview
-description: platform-tui — terminal UI and scriptable CLI for the Golain platform API.
+title: Golain CLI overview
+description: golain — terminal UI and scriptable CLI for the Golain platform API.
 ---
 
-**platform-tui** is the official terminal interface to Golain. It ships from the [ilyama](https://github.com/golain-io/ilyama) repository under `tools/platform-tui/`.
+**golain** is the official terminal interface to Golain. It ships from the [ilyama](https://github.com/golain-io/ilyama) repository under `tools/platform-tui/` and is distributed at **https://tools.ilyama.golain.io**.
+
+The binary was formerly named `platform-tui`; the CDN installer still provides a **`platform-tui` symlink** for back-compat.
 
 Use it two ways:
 
 | Mode | How | Best for |
 |------|-----|----------|
-| **TUI** | Run `platform-tui` with no subcommand | Interactive browsing, stats, live event stream |
-| **CLI** | `platform-tui <command> [flags]` | Scripts, CI, JSON output |
+| **TUI** | Run `golain` with no subcommand | Interactive browsing, stats, live event stream, Omega deploy wizard |
+| **CLI** | `golain <command> [flags]` | Scripts, CI, JSON output |
 
 Both modes share the same credential profiles and org/project **context**.
 
 ## Install
 
-→ [Install platform-tui](/tools/platform-tui/install)
+```bash
+curl -fsSL https://tools.ilyama.golain.io/install.sh | sh
+```
+
+→ Full options: [Install golain](/tools/platform-tui/install)
 
 ## Quick example
 
 ```bash
-platform-tui login
-platform-tui context set --org=my-org --project=my-project
-platform-tui fleets list
-platform-tui devices list --fleet=sensors
-platform-tui --output=json devices mqtt-details sensor-01 --fleet=sensors
+golain login
+golain context set --org=my-org --project=my-project
+golain fleets list
+golain devices list --fleet=sensors
+golain --output=json devices mqtt-details sensor-01 --fleet=sensors
 ```
+
+## Omega edge deploy
+
+For SQLite replication on edge devices, use the **Deploy Omega** wizard in the TUI or the **`golain omega scaffold`** CLI. Both download **Omega** and **SQLite deps** from the CDN, issue MQTT certificates, generate config, and seed a sample database.
+
+```bash
+golain omega scaffold --device=sensor-01 --fleet=sensors --sample-db --transport=tls
+```
+
+→ [Omega deploy guide](/tools/platform-tui/omega-deploy)
 
 ## Global flags
 
@@ -37,6 +53,19 @@ platform-tui --output=json devices mqtt-details sensor-01 --fleet=sensors
 | `--yes` | `false` | Skip confirmation prompts |
 
 Exit codes: `0` success · `1` error · `2` not found.
+
+## Release channels
+
+| Channel | Manifest | Typical use |
+|---------|----------|-------------|
+| `stable` | `manifest/stable.json` | Default for end users |
+| `latest` | `manifest/latest.json` | CI builds from `main` |
+| `dev` | `manifest/dev.json` | Maintainer testing |
+
+```bash
+golain channel set --name=stable
+golain upgrade
+```
 
 ## Feature parity with console
 
@@ -49,25 +78,32 @@ Exit codes: `0` success · `1` error · `2` not found.
 | Users | List org members |
 | Events | Audit, MQTT, TSDB snapshots + live SSE watch |
 | Edge sync | Lineages, schema reviews, staged/written rows |
+| Omega deploy | TUI wizard + `omega scaffold` |
 
 ## TUI highlights
 
-Interactive screens include **Stats & graphs**, **Event stream**, **Data explorer** (QueryScript), and **Edge sync** governance. See [TUI guide](/tools/platform-tui/tui-guide).
+Interactive screens include **Stats & graphs**, **Event stream**, **Data explorer** (QueryScript), **Edge sync** governance, and **Deploy Omega** from device detail. See [TUI guide](/tools/platform-tui/tui-guide).
 
-## vs Golain CLI
+## vs Device SSH CLI
 
-| | platform-tui | golain-cli |
-|---|--------------|------------|
-| Scope | Full platform API | Devices + SSH focus |
+| | golain (this tool) | golain-cli (SSH) |
+|---|-------------------|------------------|
+| Scope | Full platform API + Omega deploy | Devices + SSH focus |
 | Output | table/json/jsonl | Human tables |
 | TUI | Yes | No |
 | SSH to device | No | Yes (`golain ssh`) |
 
-Use both: `platform-tui` for fleet ops, `golain-cli` for field SSH.
+Use both: **golain** for fleet ops and edge scaffolding, **golain-cli** for field SSH.
 
 <CardGroup cols={2}>
+  <Card title="Install" icon="download" href="/tools/platform-tui/install">
+    CDN install and upgrade.
+  </Card>
   <Card title="Login & profiles" icon="key" href="/tools/platform-tui/login">
     Zitadel device authorization flow.
+  </Card>
+  <Card title="Omega deploy" icon="server" href="/tools/platform-tui/omega-deploy">
+    Scaffold Omega + SQLite sync from CLI or TUI.
   </Card>
   <Card title="CLI reference" icon="book" href="/tools/platform-tui/cli-reference">
     All subcommands and examples.

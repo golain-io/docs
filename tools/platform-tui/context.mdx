@@ -1,17 +1,17 @@
 ---
 title: Context
-description: Set org and project scope for platform-tui commands.
+description: Set org and project scope for golain commands.
 ---
 
 After login, set a **context** so commands default to the right org and project (similar to `kubectl config use-context`).
 
 ```bash
-platform-tui context set --org=my-org --project=my-project
-platform-tui context get
+golain context set --org=my-org --project=my-project
+golain context get
 
 # Clear selectively
-platform-tui context unset --project
-platform-tui context unset --org      # clears org and project
+golain context unset --project
+golain context unset --org      # clears org and project
 ```
 
 Context is stored in the active profile JSON alongside credentials.
@@ -19,8 +19,9 @@ Context is stored in the active profile JSON alongside credentials.
 Once set, omit `--org` and `--project` on subcommands:
 
 ```bash
-platform-tui fleets list
-platform-tui devices list --fleet=sensors
+golain fleets list
+golain devices list --fleet=sensors
+golain omega scaffold --device=sensor-01 --fleet=sensors --sample-db
 ```
 
 ## Multiple environments
@@ -28,11 +29,11 @@ platform-tui devices list --fleet=sensors
 Use named profiles for staging vs production:
 
 ```bash
-platform-tui login --profile=prod
-platform-tui login --profile=staging
+golain login --profile=prod
+golain login --profile=staging
 
-platform-tui --profile=staging context set --org=lab --project=dev
-platform-tui --profile=prod context set --org=acme --project=production
+golain --profile=staging context set --org=lab --project=dev
+golain --profile=prod context set --org=acme --project=production
 ```
 
 ## TUI behavior

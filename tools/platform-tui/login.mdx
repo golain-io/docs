@@ -1,15 +1,15 @@
 ---
 title: Login and authentication
-description: Authenticate platform-tui with Zitadel OIDC device authorization.
+description: Authenticate golain with Zitadel OIDC device authorization.
 ---
 
-`platform-tui` stores credentials per **profile** at `~/.config/platform-tui/profiles/{name}.json` (mode `0600`).
+`golain` stores credentials per **profile** at `~/.config/golain/profiles/{name}.json` (mode `0600`). Legacy profiles under `~/.config/platform-tui/profiles/` are still read.
 
 ## Device authorization login
 
 ```bash
-platform-tui login                      # default profile
-platform-tui login --profile=staging    # named profile
+golain login                      # default profile
+golain login --profile=staging    # named profile
 ```
 
 The CLI prompts for:
@@ -25,9 +25,9 @@ It prints a user code, opens the verification URL, and polls until you approve. 
 Check identity:
 
 ```bash
-platform-tui whoami
-platform-tui profiles
-platform-tui logout
+golain whoami
+golain profiles
+golain logout
 ```
 
 ## Zitadel application setup
@@ -52,12 +52,12 @@ Optional: enable **User roles in token** if you rely on custom Zitadel roles.
 | Zitadel | `https://dev.zitadel.golain.io` |
 | Client ID | `258724445991010309@dev-apis` |
 
-Override with env vars: `PLATFORM_API_URL`, `PLATFORM_ZITADEL_ENDPOINT`, `PLATFORM_ZITADEL_CLIENT_ID`.
+Override with env vars: `GOLAIN_API_URL`, `GOLAIN_ZITADEL_ENDPOINT`, `GOLAIN_ZITADEL_CLIENT_ID` (legacy `PLATFORM_*` aliases work).
 
 When apis runs with `AUTH_BYPASS=true`, any bearer token works:
 
 ```bash
-PLATFORM_TOKEN=dev PLATFORM_API_URL=http://localhost:19090 platform-tui fleets list
+GOLAIN_TOKEN=dev GOLAIN_API_URL=http://localhost:19090 golain fleets list
 ```
 
 ## CI without interactive login
@@ -65,9 +65,9 @@ PLATFORM_TOKEN=dev PLATFORM_API_URL=http://localhost:19090 platform-tui fleets l
 For automated jobs against a bypass or service-account endpoint:
 
 ```bash
-export PLATFORM_API_URL=https://api.staging.example.com
-export PLATFORM_TOKEN=<token>
-platform-tui --output=json fleets list
+export GOLAIN_API_URL=https://api.staging.example.com
+export GOLAIN_TOKEN=<token>
+golain --output=json fleets list
 ```
 
 Prefer short-lived tokens and locked-down staging environments for CI.

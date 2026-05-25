@@ -14,8 +14,8 @@ flowchart LR
   Start --> Edge[Software on device hardware]
   Start --> Host[Run platform on my VM]
   Web --> PW[Web console]
-  Script --> PTUI[platform-tui CLI]
-  Script --> GCLI[golain-cli SSH]
+  Script --> GL[golain CLI]
+  Script --> SSH[golain-cli SSH]
   Edge --> Omega[Omega edge runtime]
   Host --> VM[Self-hosted vm-edge]
 ```
@@ -30,34 +30,48 @@ flowchart LR
 
 → [Console overview](/console/overview) · [Quickstart](/getting-started/quickstart)
 
-## Platform CLI — `platform-tui`
+## Golain CLI (`golain`)
 
 **Best for:** DevOps, SRE, agents, CI pipelines, power users who want JSON output.
 
+Install from CDN:
+
+```bash
+curl -fsSL https://tools.ilyama.golain.io/install.sh | sh
+```
+
 - Full CRUD for orgs, projects, fleets, devices, tags, OTA, integrations
 - Interactive **TUI** when run without subcommands
+- **`golain omega scaffold`** and TUI **Deploy Omega** wizard for edge SQLite sync
 - Device authorization login; profiles for staging vs production
 
-→ [Platform CLI overview](/tools/platform-tui/overview)
+→ [Golain CLI overview](/tools/platform-tui/overview)
 
-## Golain CLI
+## Device SSH CLI (`golain-cli`)
 
 **Best for:** operators who need **SSH into devices** through the MQTT bridge.
 
+- Separate tool from **golain** (platform CLI/TUI)
 - `golain login` → `golain set` → `golain devices` → `golain ssh <name>`
 - Focused command set; production endpoints baked in
 
-→ [Golain CLI overview](/tools/golain-cli/overview)
+→ [Device SSH CLI overview](/tools/golain-cli/overview)
 
 ## Omega edge runtime
 
 **Best for:** firmware and edge engineers shipping software onto Linux, macOS, or Windows hardware.
 
-- Profile-driven YAML (`clients/*.yaml`)
+Install from CDN:
+
+```bash
+curl -fsSL https://tools.ilyama.golain.io/omega/install.sh | sh
+```
+
+- Profile-driven YAML (`clients/*.yaml`) or scaffold-generated config
 - Modules: shadow, OTA, heartbeat, RPC, SQLite replication, robotics, etc.
 - [JITR](/edge/jitr) for certificate-based enrollment against ilyama
 
-→ [Edge overview](/edge/overview)
+→ [Edge overview](/edge/overview) · [Omega deploy](/tools/platform-tui/omega-deploy)
 
 ## Self-hosted operator
 
@@ -70,11 +84,11 @@ flowchart LR
 
 ## Typical end-to-end flow
 
-1. **Operator** creates org/project/fleet in console or `platform-tui`.
-2. **Edge engineer** builds Omega with `make build-client CLIENT=ilyama-edge`, enrolls via JITR, connects MQTT.
-3. **Support** monitors connectivity in console Event Stream or `platform-tui events watch`.
+1. **Operator** creates org/project/fleet in console or `golain`.
+2. **Edge engineer** runs `golain omega scaffold` (or TUI wizard), starts Omega, connects MQTT.
+3. **Support** monitors connectivity in console Event Stream or `golain events watch`.
 4. **Release engineer** publishes OTA release, creates deployment, triggers rollout.
-5. **Field tech** uses `golain ssh` for interactive shell when RPC/SSH module is enabled on device.
+5. **Field tech** uses **golain-cli** `golain ssh` for interactive shell when RPC/SSH module is enabled on device.
 
 ## Local development vs production
 
@@ -83,6 +97,6 @@ flowchart LR
 | Infra | `make dev-provision` (Docker) | vm-edge compose stacks |
 | Auth | `AUTH_BYPASS` or dev Zitadel | Real Zitadel + TLS |
 | Web UI | `npm run dev` + mock server | Built Docker image + nginx |
-| Edge | Omega + `-client clients/ilyama-edge.yaml` | Client-specific binary + JITR |
+| Edge | `golain omega scaffold` or Omega + `-client clients/ilyama-edge.yaml` | Client-specific binary + JITR |
 
 → [Local development](/self-hosted/local-development)

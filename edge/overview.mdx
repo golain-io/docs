@@ -28,6 +28,15 @@ Repository: [golain-io/omega](https://github.com/golain-io/omega)
 
 ## Build strategies
 
+**CDN / scaffold** — install Omega and SQLite deps, or let golain scaffold everything:
+
+```bash
+curl -fsSL https://tools.ilyama.golain.io/omega/install.sh | sh
+golain omega scaffold --device=my-device --fleet=my-fleet --sample-db --transport=tls
+```
+
+→ [Install Omega](/edge/install) · [Omega deploy](/tools/platform-tui/omega-deploy)
+
 **Development** — all modules, load YAML from disk:
 
 ```bash

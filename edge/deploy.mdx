@@ -1,18 +1,46 @@
 ---
 title: Deploy Omega
-description: Run Omega as systemd, launchd, or Windows service in production.
+description: Deploy Omega with golain scaffold, systemd, launchd, or Windows service.
 ---
 
-Production deployments use **client-specific binaries** — connection and modules are embedded at build time. Only secrets and device identity come from environment variables.
+## Quick path: golain scaffold (dev and SQLite sync)
 
-## Build for target
+For Golain SQLite replication, the fastest path is **`golain omega scaffold`** or the TUI **Deploy Omega** wizard. Both download Omega + SQLite deps from CDN, issue MQTT certificates, and write ready-to-run config.
+
+```bash
+golain login
+golain context set --org=my-org --project=my-project
+golain devices create --name=gw-01 --fleet=sensors
+
+golain omega scaffold \
+  --device=gw-01 \
+  --fleet=sensors \
+  --sample-db \
+  --transport=tls \
+  --out=~/.config/golain/omega/gw-01
+
+source ~/.config/golain/omega/gw-01/omega-env.sh
+~/.config/golain/omega/gw-01/omega -client ~/.config/golain/omega/gw-01/omega-config.yaml
+```
+
+<Tip>
+  Use **`--transport=tls`** when QUIC fails against your broker. The TUI wizard offers the same transport choice.
+</Tip>
+
+The TUI wizard additionally generates **systemd**, **launchd**, **OpenRC**, or **init.d** unit files. → [Omega deploy guide](/tools/platform-tui/omega-deploy)
+
+---
+
+## Production: client-specific binary
+
+Production deployments often use **client-specific binaries** — connection and modules are embedded at build time. Only secrets and device identity come from environment variables.
 
 ```bash
 make build-client CLIENT=ilyama-edge GOOS=linux GOARCH=arm64
 # → bin/omega-linux-arm64
 ```
 
-Copy the binary to the device. No YAML file required on disk.
+Copy the binary to the device. No YAML file required on disk when config is embedded.
 
 ## Linux (systemd)
 
@@ -63,6 +91,8 @@ sudo systemctl start omega
 sudo journalctl -u omega -f
 ```
 
+When using scaffold output, the TUI wizard writes a unit file under your `--out` directory with install commands.
+
 ## macOS (launchd)
 
 Install binary to `/usr/local/bin/omega`, create `~/Library/LaunchAgents/io.golain.omega.plist` with `EnvironmentVariables` for `OMEGA_*` vars, then:
@@ -100,5 +130,6 @@ Prefer host networking or explicit MQTT DNS when bridging to on-prem brokers.
 - [ ] `expose_sensitive_telemetry: false` unless required
 - [ ] Secrets in env vars or secret manager — not in unit files committed to git
 - [ ] Device registered in Golain console before first connect (or JITR bootstrap cert ready)
+- [ ] SQLite deps installed when using replication (`install-sqlite-deps.sh` or scaffold)
 
-→ [Remote control](/edge/remote-control)
+→ [Remote control](/edge/remote-control) · [Omega setup for SQLite sync](/edge/data-sync/omega-setup)

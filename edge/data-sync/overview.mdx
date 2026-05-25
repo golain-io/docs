@@ -35,7 +35,7 @@ flowchart LR
     W --> M
   end
   subgraph ops [You]
-    TUI[platform-tui Edge Sync]
+    TUI[golain Edge Sync]
     API[HTTP /edge/* API]
     TUI --> API --> W
   end
@@ -65,15 +65,15 @@ flowchart LR
 | **Omega** `sqlite-replication` module | [golain-io/omega](https://github.com/golain-io/omega) | Triggers, journal, MQTT publish, pause/resume on device |
 | **MQTT broker** | [golain-io/ilyama](https://github.com/golain-io/ilyama) | mTLS auth, topic ACL, ingress to worker queue |
 | **Integration worker** | ilyama | Ingest, classify schema, stage, review RPC, replay, mirror DDL |
-| **HTTP API + platform-tui** | ilyama | Operator governance and inspection |
+| **HTTP API + golain** | ilyama | Operator governance and inspection |
 
 Reference client: **`ilyama-edge`** (`omega/clients/ilyama-edge.yaml`).
 
 ## Typical first-time flow
 
-1. **Register device** in console or `platform-tui` — note device **name** (used as MQTT client ID / topic segment).
-2. **Provision mTLS certs** for the device (cert worker or JITR — see [provisioning checklist](/edge/data-sync/provisioning-checklist)).
-3. **Configure Omega** with `OMEGA_SOURCE_DB_PATH`, broker URL, `OMEGA_ROOT_TOPIC`, TLS paths.
+1. **Register device** in console or `golain` — note device **name** (used as MQTT client ID / topic segment).
+2. **Scaffold Omega** with `golain omega scaffold` or [install manually](/edge/install) — issues certs, downloads Omega + SQLite deps.
+3. **Configure Omega** with generated `omega-config.yaml` / `omega-env.sh` (or manual `OMEGA_*` vars).
 4. **Start Omega** — module installs triggers on user tables; first batches arrive in cloud.
 5. **Approve schema** — default policy queues review on first sight of a table; claim + approve in Edge Sync.
 6. **Query data** — mirror rows via API/TUI or QueryScript after materialization.
@@ -92,6 +92,7 @@ Reference client: **`ilyama-edge`** (`omega/clients/ilyama-edge.yaml`).
 - [Backpressure](/edge/data-sync/backpressure) — pause/resume when backlog grows
 
 ### Edge agent
+- [golain Omega deploy](/tools/platform-tui/omega-deploy)
 - [Omega setup](/edge/data-sync/omega-setup)
 - [Configuration reference](/edge/data-sync/configuration)
 - [Capture strategies](/edge/data-sync/capture-strategies)
@@ -99,7 +100,7 @@ Reference client: **`ilyama-edge`** (`omega/clients/ilyama-edge.yaml`).
 
 ### Operations
 - [Schema review workflow](/edge/data-sync/schema-review-workflow) — step-by-step operator guide
-- [platform-tui Edge Sync](/edge/data-sync/platform-tui-guide)
+- [golain Edge Sync](/edge/data-sync/platform-tui-guide)
 - [HTTP API](/edge/data-sync/api-reference)
 - [Querying synced data](/edge/data-sync/querying-data)
 - [Troubleshooting](/edge/data-sync/troubleshooting)
@@ -121,7 +122,7 @@ Document these when planning production rollouts:
 | Omega telemetry batches | `sync/telemetry/batch` flush is not fully implemented — use `strategy: rows` for time-series-shaped tables |
 | Bootstrap snapshot | `snapshot_on_first_run` flag exists but is **not implemented** — only mutations **after** Omega starts replicate |
 | Secondary upload flow | Presigned URL bootstrap/spill path specified but not implemented in Omega |
-| platform-tui approve shortcut | Dev TUI approve mirrors a single column — use HTTP API for full `column_actions` in production |
+| golain TUI approve shortcut | Dev TUI approve mirrors a single column — use HTTP API for full `column_actions` in production |
 | Authz on mirror reads | Product-level authorized reads for mirror tables still evolving |
 
 See [Troubleshooting](/edge/data-sync/troubleshooting) for operational workarounds.

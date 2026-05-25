@@ -1,19 +1,21 @@
 ---
-title: platform-tui Edge Sync
-description: Operate lineages, schema reviews, and staged vs written data in the TUI.
+title: golain Edge Sync
+description: Operate lineages, schema reviews, and staged vs written data in the golain TUI.
 ---
 
-**Edge Sync** in platform-tui is the primary operator UI for SQLite replication governance when you prefer a terminal over raw HTTP.
+**Edge Sync** in golain is the primary operator UI for SQLite replication governance when you prefer a terminal over raw HTTP.
 
 ## Access
 
 ```bash
-platform-tui login
-platform-tui context set --org=my-org --project=my-project
-platform-tui    # no subcommand → TUI
+golain login
+golain context set --org=my-org --project=my-project
+golain    # no subcommand → TUI
 ```
 
 Navigate: **Project menu → Edge Sync**
+
+After deploying Omega via scaffold or the TUI wizard, refresh lineages here to claim schema reviews.
 
 ## Menu structure
 
@@ -107,12 +109,14 @@ Select for **review detail**.
 
 ## Typical operator session
 
-1. **`r`** on Edge Sync menu — refresh lineages after device deploy.
-2. Open **Schema Reviews** — claim newest `queued`.
-3. **`d`** — confirm staged JSON looks correct.
-4. Approve via API (or **`a`** for trivial tables).
-5. Return to **Lineages** → **`w`** — confirm mirror rows.
-6. **`events watch`** in separate terminal for `materialization_failed` events.
+1. Deploy Omega with [golain scaffold](/tools/platform-tui/omega-deploy) or TUI wizard.
+2. Start Omega on the device; confirm device **connected** in console or `golain devices get`.
+3. **`r`** on Edge Sync menu — refresh lineages.
+4. Open **Schema Reviews** — claim newest `queued`.
+5. **`d`** — confirm staged JSON looks correct.
+6. Approve via API (or **`a`** for trivial tables).
+7. Return to **Lineages** → **`w`** — confirm mirror rows.
+8. **`golain events watch`** in separate terminal for `materialization_failed` events.
 
 ## Not available in TUI yet
 
@@ -128,7 +132,7 @@ List lineages as JSON for scripts:
 
 ```bash
 # Requires API exposure or future CLI subcommand — today use curl:
-curl -s -H "Authorization: Bearer $(platform-tui whoami 2>/dev/null)" ...
+curl -s -H "Authorization: Bearer $(golain whoami 2>/dev/null)" ...
 ```
 
 Edge Sync is TUI-first; governance mutations map 1:1 to [API reference](/edge/data-sync/api-reference) routes.
@@ -137,3 +141,4 @@ Edge Sync is TUI-first; governance mutations map 1:1 to [API reference](/edge/da
 
 - [Schema review workflow](/edge/data-sync/schema-review-workflow)
 - [TUI guide (general)](/tools/platform-tui/tui-guide)
+- [Omega deploy](/tools/platform-tui/omega-deploy)

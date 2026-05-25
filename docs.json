@@ -70,18 +70,19 @@
         "tab": "Tools",
         "groups": [
           {
-            "group": "Platform CLI (platform-tui)",
+            "group": "Golain CLI",
             "pages": [
               "tools/platform-tui/overview",
               "tools/platform-tui/install",
               "tools/platform-tui/login",
               "tools/platform-tui/context",
               "tools/platform-tui/cli-reference",
-              "tools/platform-tui/tui-guide"
+              "tools/platform-tui/tui-guide",
+              "tools/platform-tui/omega-deploy"
             ]
           },
           {
-            "group": "Golain CLI",
+            "group": "Device SSH CLI",
             "pages": [
               "tools/golain-cli/overview",
               "tools/golain-cli/install",
@@ -119,6 +120,7 @@
           {
             "group": "Edge agent (Omega)",
             "pages": [
+              "tools/platform-tui/omega-deploy",
               "edge/data-sync/omega-setup",
               "edge/data-sync/configuration",
               "edge/data-sync/capture-strategies",
