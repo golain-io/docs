@@ -26753,7 +26753,7 @@
   ],
   "servers": [
     {
-      "url": "https://api.golain.io/core/api/v1",
+      "url": "https://api.ilyama.golain.io/core/api/v1",
       "description": "Production"
     },
     {

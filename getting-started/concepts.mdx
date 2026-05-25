@@ -31,7 +31,7 @@ Golain uses **Zitadel** (OIDC) for human users:
 
 - **Web console (`pw`)** — authorization code flow; access token stored in the browser; API requests send `Authorization: Bearer …` and `ORG-ID`.
 - **Platform CLI (`platform-tui`)** — OAuth **device authorization** grant (RFC 8628); no client secret; token stored in `~/.config/platform-tui/profiles/`.
-- **Golain CLI** — OAuth browser flow against production endpoints (`api.golain.io`, `zitadel.golain.io`).
+- **Golain CLI** — OAuth browser flow against production endpoints (`api.ilyama.golain.io`, Zitadel).
 - **Devices** — MQTT mTLS or username/password plus optional [JITR bootstrap certificates](/edge/jitr); not user OIDC tokens.
 
 <Warning>
@@ -85,7 +85,7 @@ Common roles at org level: **owner**, **admin**, **member**, **viewer**. Finer g
 
 | Environment | Typical API | Typical auth |
 |-------------|-------------|--------------|
-| Golain cloud | `https://api.golain.io` | `https://auth.golain.io` (Zitadel) |
+| Golain cloud | `https://api.ilyama.golain.io` | `https://dev.zitadel.golain.io` (Zitadel) |
 | Self-hosted VM | `https://api.<your-domain>` | `https://auth.<your-domain>` |
 | Local dev (ilyama) | `http://localhost:19090` | Dev Zitadel or `AUTH_BYPASS=true` |
 

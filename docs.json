@@ -16,6 +16,10 @@
   "navbar": {
     "links": [
       {
+        "label": "Status",
+        "href": "https://stats.uptimerobot.com/nB3RCD4iXn"
+      },
+      {
         "label": "GitHub",
         "href": "https://github.com/golain-io"
       }
@@ -23,7 +27,7 @@
     "primary": {
       "type": "button",
       "label": "Console",
-      "href": "https://app.golain.io"
+      "href": "https://web.ilyama.golain.io"
     }
   },
   "api": {
@@ -166,6 +170,11 @@
     ],
     "global": {
       "anchors": [
+        {
+          "anchor": "Status",
+          "href": "https://stats.uptimerobot.com/nB3RCD4iXn",
+          "icon": "signal"
+        },
         {
           "anchor": "GitHub",
           "href": "https://github.com/golain-io/ilyama",
