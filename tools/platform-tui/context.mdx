@@ -24,6 +24,8 @@ golain devices list --fleet=sensors
 golain omega scaffold --device=sensor-01 --fleet=sensors --sample-db
 ```
 
+**Edge Sync** in the TUI requires both org and project context — it calls `/projects/{project_id}/edge/*` routes scoped to the active project.
+
 ## Multiple environments
 
 Use named profiles for staging vs production:

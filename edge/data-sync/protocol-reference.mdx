@@ -3,9 +3,11 @@ title: Protocol reference (redirect)
 description: Edge sync wire protocol docs have moved to dedicated pages.
 ---
 
-The edge SQLite sync wire protocol is documented in dedicated pages:
+The edge SQLite sync **client wire protocol** (MQTT topics, JSON payloads, downlink control) is unchanged in edge v2 — only the cloud-side ingress and worker routing moved to the dedicated **edge domain** (`edge_ingress_exchange`, edge worker).
 
-- [Topics and connection](/edge/data-sync/topics-and-connection)
+Operator and integrator docs:
+
+- [Topics and connection](/edge/data-sync/topics-and-connection) — transport, auth, topic table, **v2 server routing**
 - [Payload formats](/edge/data-sync/payload-formats)
 - [Downlink control](/edge/data-sync/downlink-control)
 - [Limits, deduplication, and errors](/edge/data-sync/limits-dedup-errors)

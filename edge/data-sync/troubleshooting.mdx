@@ -11,8 +11,8 @@ Structured troubleshooting for edge SQLite replication. Work top-down: connectiv
 flowchart TD
   A[No lineages in Edge Sync] --> B{Device connected?}
   B -->|No| C[Fix MQTT / certs / root topic]
-  B -->|Yes| D{Segments in export ledger?}
-  D -->|No| E[ACL topic / payload reject]
+  B -->|Yes| D{Edge worker ingesting?}
+  D -->|No| E[Check edge worker + rabbitmq topology]
   D -->|Yes| F{Review queued?}
   F -->|Yes| G[Approve schema]
   F -->|No| H{Staged rows only?}
@@ -25,11 +25,50 @@ flowchart TD
 | Symptom | Likely cause | Section |
 |---------|--------------|---------|
 | No lineages at all | MQTT not publishing sync topics | [Connectivity](#connectivity) |
+| Device connected, still no lineages | Edge worker down or v1 topology | [Edge v2 cutover](#edge-v2-cutover) |
 | Lineage paused, review queued | First schema / ambiguous change | [Schema review](#schema-review-issues) |
 | Staged rows growing, no mirror | Not approved or materialization failing | [Materialization](#materialization) |
 | Device stopped sending one table | `pause_lineage` downlink | [Backpressure](#backpressure-on-device) |
 | Pre-seeded DB empty in cloud | No snapshot on first run | [Historical data](#historical-data-gaps) |
+| State write-back 403/409 | Wrong authority or missing approve | [State write-back](#state-write-back) |
 | Approve API 500 | Worker bug / binding order | [Approve failures](#approve-failures) |
+
+---
+
+## Edge v2 cutover
+
+After upgrading to edge v2 (ilyama PR #283), batches route through **`edge_ingress_exchange`** and the **edge worker** — not the integration worker or legacy `telemetry.edge_export_segment` ingress.
+
+### No lineages despite MQTT traffic
+
+**Check:**
+
+1. **Edge worker registered** — domain-workers logs should show `edge worker registered`. If `EDGE_WORKER_DISABLED=1`, unset it and restart.
+2. **RabbitMQ topology synced** — run `make rabbitmq-topology` after upgrade. Queues must exist on `edge_ingress_exchange` (`edge_telemetry_ingest_stream`, `edge_state_ingest_queue`, `edge_meta_queue`).
+3. **TSDB available** — edge worker requires Timescale for staging and mirror tables. Startup fails closed if TSDB pool is missing.
+4. **Broker fan-in** — mqtt-broker must publish to `edge_ingress_exchange` (not integration exchange). Confirm broker version matches edge v2 hooks.
+
+**Symptoms of stale topology:**
+
+- MQTT connects; no lineages; no edge worker consume logs
+- Broker logs show publish to unknown exchange or unrouted messages
+
+### Downlink controls not reaching device
+
+**Check:**
+
+1. Edge worker stages **`EdgeIngestControlRequestedV2`** (domain `edge`, not `integration`).
+2. `mqtt_broker_downlink_queue` binding includes `edge.ingest_control.requested.v1`.
+3. Device subscribes to `{root}/sync/ingest/control` with persistent session (QoS 1).
+
+### Telemetry vs row batches mixed up
+
+| Topic | Expected pipeline |
+|-------|-------------------|
+| `sync/telemetry/batch` | Pipeline A — telemetry ingest stream |
+| `sync/rows/batch` | Pipeline B — state ingest queue |
+
+Publishing row journal data on the telemetry topic (or vice versa) causes validation rejects or empty lineages.
 
 ---
 
@@ -45,8 +84,8 @@ flowchart TD
 - Firewall allows MQTT TLS (8883) or QUIC UDP
 
 ```bash
-platform-tui devices get <name> --fleet=<fleet>
-platform-tui events list --source=mqtt --limit=20
+golain devices get <name> --fleet=<fleet>
+golain events list --source=mqtt --limit=20
 ```
 
 ### Connected but no lineages
@@ -62,7 +101,7 @@ platform-tui events list --source=mqtt --limit=20
 
 ```bash
 journalctl -u omega -f
-# Look for sync/rows/batch publish lines
+# Look for sync/rows/batch or sync/telemetry/batch publish lines
 ```
 
 ### Batch rejected at broker/worker
@@ -96,9 +135,9 @@ Common rejection codes:
 
 ### Device still sending during review
 
-**Normal.** Cloud stages server-side. Device does **not** receive `pause_lineage` for review-only pause.
+**Normal.** Cloud stages server-side for **both Pipeline A (telemetry) and Pipeline B (rows/batch)**. Device does **not** receive `pause_lineage` for review-only pause.
 
-Verify staged rows increasing (**`d`** in TUI).
+Verify staged rows increasing (**`d`** in TUI). Telemetry batches appear with `event_ts`; row batches show `commit_seq`.
 
 ### Schema hash mismatch after firmware update
 
@@ -116,8 +155,8 @@ Application migration changed DDL → new hash → new review.
 
 1. Replay intent completed? — lineage detail in TUI
 2. Materialization error count > 0? — use **`x`** reset after fixing root cause
-3. Worker version includes live materialization fix (deployed stack may lag)
-4. Column actions all `ignore`? — re-approve with `mirror`
+3. Edge worker running with TSDB (not integration worker)
+4. Column actions all `ignore`? — re-approve with `mirror` or `auto_create_and_map`
 
 **API:**
 
@@ -134,9 +173,33 @@ Transient mirror DDL or write error. Rows staged with reason `materialization_fa
 
 ### Live batches dropped after approve
 
-Indicates missing **live materialization path** on worker — rows accepted to ledger but not written to mirror for **active** lineage.
+Indicates missing live materialization path or edge worker not consuming the correct pipeline queue.
 
-**Mitigation:** Ensure deployed worker includes `edge_mirror.go` live write path; staged replay may still work for backlog.
+**Mitigation:** Confirm edge worker version includes live write paths for your pipeline; staged replay may still work for backlog.
+
+---
+
+## State write-back
+
+### HTTP 403 `edge_state_not_cloud_authoritative`
+
+The lineage sync authority is **device_authoritative**. Cloud write-back only works for tables approved as **cloud_authoritative**.
+
+**Action:** Re-approve with the correct authority or use device-side journal updates instead.
+
+### HTTP 404 / mirror not provisioned
+
+Complete schema review before calling state write-back. Mirror/state DDL is provisioned on approve.
+
+### Device never applies state_write downlink
+
+**Check:**
+
+1. Response includes `control_id` — track in `edge_pending_controls` until device ACKs
+2. Device subscribed to `sync/ingest/control`
+3. Omega version implements `state_write` control kind
+
+→ [Downlink control](/edge/data-sync/downlink-control#state_write)
 
 ---
 
@@ -148,7 +211,13 @@ Historical deployed bug: mirror binding upsert before `mirror_id` assigned.
 
 **Symptoms:** Approve fails with internal error; review stays `in_review`.
 
-**Action:** Deploy worker fix from ilyama `edge_review_rpc.go` (provision mirror before binding upsert). Contact platform team if self-hosted on older build.
+**Action:** Deploy current edge worker from ilyama. Contact platform team if self-hosted on older build.
+
+### HTTP 409 on TUI auto-approve
+
+TUI **`a`** enables `allow_auto_create_device_data_points` via policy PATCH before approve. If policy PATCH returns 404 or approve returns 409, use the HTTP API with explicit `column_actions`.
+
+**Action:** Refresh review (**`r`**) and retry, or approve via [API reference](/edge/data-sync/api-reference).
 
 ### defer columns block activation
 
@@ -209,8 +278,9 @@ Journal accumulates while Omega offline (triggers still fire). On restart, flush
 | Filter API by MQTT **name** instead of UUID | Empty query results |
 | `OMEGA_DEVICE_ID` ≠ registered name | Wrong topic / no ingest |
 | JITR device_name mismatch | Enrollment failure |
+| State write `table_id` ≠ lineage UUID | 404 / bad request |
 
-Use `platform-tui devices get` for UUID vs name.
+Use `golain devices get` for UUID vs name. Use lineage ID from Edge Sync for state write-back.
 
 ---
 
@@ -230,9 +300,11 @@ Use `platform-tui devices get` for UUID vs name.
 
 | Issue | Note |
 |-------|------|
-| **`a` approve only mirrors `value`** | Use API for multi-column tables |
-| No registry UI | Use HTTP routes |
-| Written view 404 | Mirror not provisioned — complete approve first |
+| **`a` approve auto-maps from registry schema** | PK columns → mirror; timestamp columns → ignore; others → auto_create_and_map |
+| **`f` cycles review filter** | All / Queued / In Review / Approved / Rejected / Abandoned |
+| **`v` from lineage detail** | Jump to schema review when lineage paused |
+| Registry reviews in TUI | Uses registry review API — approve via HTTP for bespoke column actions |
+| Written view falls back to QueryScript | When mirror-rows 404, TUI queries telemetry by device |
 
 ---
 
@@ -242,11 +314,12 @@ When filing an issue, include:
 
 ```bash
 # Redact secrets
-platform-tui --output=json devices get <name> --fleet=<fleet>
-platform-tui --output=json events list --source=mqtt --limit=50
+golain --output=json devices get <name> --fleet=<fleet>
+golain --output=json events list --source=mqtt --limit=50
 
 # Lineage + review IDs from TUI or API
-# Worker version / git SHA if self-hosted
+# Edge worker version / git SHA if self-hosted
+# Confirm make rabbitmq-topology applied after upgrade
 # omega -version
 # Sample staged row JSON (one row)
 ```

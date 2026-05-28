@@ -1,6 +1,15 @@
 {
   "components": {
     "parameters": {
+      "IdempotencyKey": {
+        "description": "Optional client dedupe key forwarded to the domain worker RPC for safe retries.",
+        "in": "header",
+        "name": "Idempotency-Key",
+        "required": false,
+        "schema": {
+          "type": "string"
+        }
+      },
       "IntegrationAuditKeyword": {
         "description": "Keyword search within audit entries (alternative mode to org-wide or entity-scoped listing).",
         "in": "query",
@@ -704,6 +713,25 @@
         ],
         "type": "object"
       },
+      "EdgeStateWriteRow": {
+        "properties": {
+          "pk": {
+            "additionalProperties": true,
+            "description": "Primary key columns for the target SQLite table row.",
+            "type": "object"
+          },
+          "values": {
+            "additionalProperties": true,
+            "description": "Column values to write for cloud-authoritative state.",
+            "type": "object"
+          }
+        },
+        "required": [
+          "pk",
+          "values"
+        ],
+        "type": "object"
+      },
       "EdgeTableLineage": {
         "properties": {
           "created_at": {
@@ -723,7 +751,7 @@
             "type": "string"
           },
           "materialization_failure_count": {
-            "description": "Consecutive permanent materialization failures; present when > 0.",
+            "description": "Consecutive permanent materialization failures; present when \u003e 0.",
             "type": "integer"
           },
           "materialization_last_error": {
@@ -1918,6 +1946,23 @@
         ],
         "type": "object"
       },
+      "PatchEdgeReplicationPolicyBody": {
+        "minProperties": 1,
+        "properties": {
+          "allow_auto_create_device_data_points": {
+            "type": "boolean"
+          },
+          "schema_coalescing_mode": {
+            "enum": [
+              "per_device",
+              "project",
+              "fleet"
+            ],
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "PatchPermissionGroupRequest": {
         "additionalProperties": false,
         "properties": {
@@ -3061,6 +3106,24 @@
         ],
         "type": "object"
       },
+      "ProjectTicketWorkflowValidateResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/TicketWorkflowValidateResult"
+          },
+          "ok": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "data"
+        ],
+        "type": "object"
+      },
       "ProjectTicketWorkflowVersionsListData": {
         "properties": {
           "items": {
@@ -3305,6 +3368,21 @@
         ],
         "type": "object"
       },
+      "TicketAssignRequest": {
+        "description": "Exactly one of assigned_user_id or assigned_group_id is required.",
+        "properties": {
+          "assigned_group_id": {
+            "description": "Organization user group id (mutually exclusive with assigned_user_id)",
+            "format": "uuid",
+            "type": "string"
+          },
+          "assigned_user_id": {
+            "description": "Project member user id (mutually exclusive with assigned_group_id)",
+            "type": "string"
+          }
+        },
+        "type": "object"
+      },
       "TicketCreateRequest": {
         "properties": {
           "body": {
@@ -3380,6 +3458,37 @@
         },
         "type": "object"
       },
+      "TicketTransitionListResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "items": {
+                "items": {
+                  "additionalProperties": true,
+                  "type": "object"
+                },
+                "type": "array"
+              },
+              "meta": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "type": "object"
+          },
+          "ok": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "data"
+        ],
+        "type": "object"
+      },
       "TicketTransitionRequest": {
         "properties": {
           "form_payload": {
@@ -3395,6 +3504,21 @@
         },
         "required": [
           "to_label"
+        ],
+        "type": "object"
+      },
+      "TicketUnassignRequest": {
+        "properties": {
+          "target": {
+            "enum": [
+              "user",
+              "group"
+            ],
+            "type": "string"
+          }
+        },
+        "required": [
+          "target"
         ],
         "type": "object"
       },
@@ -3421,6 +3545,81 @@
         },
         "required": [
           "workflow"
+        ],
+        "type": "object"
+      },
+      "TicketWorkflowValidateResult": {
+        "properties": {
+          "errors": {
+            "items": {
+              "$ref": "#/components/schemas/TicketWorkflowValidationIssue"
+            },
+            "type": "array"
+          },
+          "valid": {
+            "type": "boolean"
+          },
+          "warnings": {
+            "items": {
+              "$ref": "#/components/schemas/TicketWorkflowValidationIssue"
+            },
+            "type": "array"
+          }
+        },
+        "required": [
+          "valid",
+          "errors"
+        ],
+        "type": "object"
+      },
+      "TicketWorkflowValidationIssue": {
+        "properties": {
+          "message": {
+            "type": "string"
+          },
+          "path": {
+            "description": "JSON-pointer-style location in the workflow document.",
+            "type": "string"
+          }
+        },
+        "required": [
+          "path",
+          "message"
+        ],
+        "type": "object"
+      },
+      "WriteEdgeStateRowsBody": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/EdgeStateWriteRow"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "rows"
+        ],
+        "type": "object"
+      },
+      "WriteEdgeStateRowsResponse": {
+        "properties": {
+          "control_id": {
+            "type": "string"
+          },
+          "rows_written": {
+            "type": "integer"
+          },
+          "source_table": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "control_id",
+          "rows_written",
+          "source_table"
         ],
         "type": "object"
       }
@@ -4149,6 +4348,193 @@
             "orgIdHeader": []
           }
         ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/organizations/email-templates": {
+      "get": {
+        "operationId": "listOrgEmailTemplates",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Ok"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "List organization email template overrides",
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/organizations/email-templates/{type}": {
+      "get": {
+        "operationId": "getOrgEmailTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Ok"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Get organization email template override",
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "put": {
+        "operationId": "putOrgEmailTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "body": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "body"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Ok"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid template"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Upsert organization email template override",
         "tags": [
           "Organizations"
         ]
@@ -8675,7 +9061,7 @@
         ],
         "summary": "Paginated alarm instances for a project (requires project admin).",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -8768,7 +9154,7 @@
         ],
         "summary": "POST /projects/{project_id}/alerts/{alert_id}/acknowledge",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -8861,7 +9247,7 @@
         ],
         "summary": "POST /projects/{project_id}/alerts/{alert_id}/assign",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -9446,7 +9832,7 @@
         ],
         "summary": "Paginated TSDB audit rows for a project (requires project admin).",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -10210,7 +10596,7 @@
         ],
         "summary": "GET /projects/{project_id}/dashboards",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       },
       "post": {
@@ -10293,7 +10679,7 @@
         ],
         "summary": "POST /projects/{project_id}/dashboards",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -10368,7 +10754,7 @@
         ],
         "summary": "DELETE /projects/{project_id}/dashboards/{dashboard_id}",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       },
       "patch": {
@@ -10459,7 +10845,7 @@
         ],
         "summary": "PATCH /projects/{project_id}/dashboards/{dashboard_id}",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -10535,7 +10921,7 @@
         ],
         "summary": "GET /projects/{project_id}/dashboards/{dashboard_id}/panels",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       },
       "post": {
@@ -10626,7 +11012,7 @@
         ],
         "summary": "POST /projects/{project_id}/dashboards/{dashboard_id}/panels",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -10709,7 +11095,7 @@
         ],
         "summary": "DELETE /projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       },
       "patch": {
@@ -10808,7 +11194,7 @@
         ],
         "summary": "PATCH /projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -10892,7 +11278,7 @@
         ],
         "summary": "GET /projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}/data",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -10960,7 +11346,7 @@
         ],
         "summary": "GET /projects/{project_id}/data",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -11028,7 +11414,7 @@
         ],
         "summary": "GET /projects/{project_id}/data-point-definitions",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       },
       "post": {
@@ -11111,7 +11497,7 @@
         ],
         "summary": "POST /projects/{project_id}/data-point-definitions",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -11186,7 +11572,7 @@
         ],
         "summary": "DELETE /projects/{project_id}/data-point-definitions/{data_point_definition_id}",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       },
       "patch": {
@@ -11277,7 +11663,7 @@
         ],
         "summary": "PATCH /projects/{project_id}/data-point-definitions/{data_point_definition_id}",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -11353,7 +11739,7 @@
         ],
         "summary": "GET /projects/{project_id}/data-point-definitions/{data_point_definition_id}/data",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -11446,7 +11832,7 @@
         ],
         "summary": "POST /projects/{project_id}/data-point-definitions/{data_point_definition_id}/download",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -11514,7 +11900,7 @@
         ],
         "summary": "GET /projects/{project_id}/device_data_points",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -11705,6 +12091,118 @@
           }
         ],
         "summary": "Issue a generic device command (v3)",
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/projects/{project_id}/devices/{device_id}/edge/state-tables/{table_id}/rows": {
+      "post": {
+        "description": "Persists cloud-originated state rows for one device table lineage (`table_id` is\n`edge_table_lineages.id`) and stages an MQTT downlink for the device. Handled by the\nedge worker (`WriteEdgeStateRows` RPC), not the integrations worker. Send\n`Idempotency-Key` on retries so duplicate submissions dedupe safely.\n",
+        "operationId": "writeEdgeStateRows",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "table_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WriteEdgeStateRowsBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "$ref": "#/components/schemas/WriteEdgeStateRowsResponse"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "State rows accepted; downlink staged"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Write cloud-authoritative edge state rows to a device table",
         "tags": [
           "Devices"
         ]
@@ -12032,7 +12530,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Phase 2 \u2014 copy per-device mirror rows into the shared coalesced mirror",
+        "summary": "Phase 2 — copy per-device mirror rows into the shared coalesced mirror",
         "tags": [
           "Edge replication"
         ]
@@ -12243,13 +12741,15 @@
     },
     "/projects/{project_id}/edge/lineages/{lineage_id}/mirror-rows": {
       "get": {
-        "operationId": "getProjectsProjectIdEdgeLineagesLineageIdMirrorRows",
+        "description": "Returns rows from the lineage's physical TSDB mirror table in a naturalized shape.\nEach row has `device_id`, `materialized_at`, and a `data` object containing the\nbusiness columns only. Use the `columns` query parameter to project a subset of columns.\n",
+        "operationId": "listEdgeMirrorRowsForLineage",
         "parameters": [
           {
             "in": "path",
             "name": "project_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -12258,7 +12758,31 @@
             "name": "lineage_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated list of business column names to include in the `data` object. Omit to return all columns.",
+            "in": "query",
+            "name": "columns",
+            "schema": {
+              "example": "temperature,pressure,humidity",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
             }
           }
         ],
@@ -12267,14 +12791,79 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object"
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "properties": {
+                            "columns": {
+                              "description": "Present only when the `columns` query param was supplied.",
+                              "items": {
+                                "type": "string"
+                              },
+                              "type": "array"
+                            },
+                            "mirror_table_name": {
+                              "description": "Physical TSDB table name the rows were read from.",
+                              "type": "string"
+                            },
+                            "rows": {
+                              "items": {
+                                "properties": {
+                                  "data": {
+                                    "additionalProperties": true,
+                                    "description": "Business columns for this row.",
+                                    "type": "object"
+                                  },
+                                  "device_id": {
+                                    "format": "uuid",
+                                    "type": "string"
+                                  },
+                                  "materialized_at": {
+                                    "description": "Infrastructure timestamps for this mirror row.",
+                                    "properties": {
+                                      "created_at": {
+                                        "description": "When the row was first materialized.",
+                                        "format": "date-time",
+                                        "type": "string"
+                                      },
+                                      "updated_at": {
+                                        "description": "When the row was last updated.",
+                                        "format": "date-time",
+                                        "type": "string"
+                                      }
+                                    },
+                                    "type": "object"
+                                  }
+                                },
+                                "type": "object"
+                              },
+                              "type": "array"
+                            },
+                            "source": {
+                              "description": "Whether the rows come from a per-device or coalesced mirror.",
+                              "enum": [
+                                "mirror",
+                                "coalesced"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  ]
                 }
               }
             },
-            "description": "Successful response"
+            "description": "Mirror rows loaded"
           },
-          "400": {
+          "404": {
             "content": {
               "application/json": {
                 "schema": {
@@ -12282,9 +12871,9 @@
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Lineage or mirror not found"
           },
-          "401": {
+          "503": {
             "content": {
               "application/json": {
                 "schema": {
@@ -12292,17 +12881,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Forbidden"
+            "description": "TSDB unavailable"
           }
         },
         "security": [
@@ -12311,7 +12890,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/edge/lineages/{lineage_id}/mirror-rows",
+        "summary": "List materialized relational mirror rows for an edge table lineage",
         "tags": [
           "Edge replication"
         ]
@@ -12398,13 +12977,14 @@
     },
     "/projects/{project_id}/edge/lineages/{lineage_id}/staged-rows": {
       "get": {
-        "operationId": "getProjectsProjectIdEdgeLineagesLineageIdStagedRows",
+        "operationId": "listEdgeStagedRowsForLineage",
         "parameters": [
           {
             "in": "path",
             "name": "project_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -12413,6 +12993,100 @@
             "name": "lineage_id",
             "required": true,
             "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    {
+                      "$ref": "#/components/schemas/SuccessEnvelope"
+                    },
+                    {
+                      "properties": {
+                        "data": {
+                          "properties": {
+                            "rows": {
+                              "items": {
+                                "additionalProperties": true,
+                                "type": "object"
+                              },
+                              "type": "array"
+                            }
+                          },
+                          "type": "object"
+                        }
+                      },
+                      "type": "object"
+                    }
+                  ]
+                }
+              }
+            },
+            "description": "Staged rows loaded"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Lineage not found"
+          },
+          "503": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "TSDB unavailable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "List staged (pre-materialization) rows for an edge table lineage",
+        "tags": [
+          "Edge replication"
+        ]
+      }
+    },
+    "/projects/{project_id}/edge/policy": {
+      "get": {
+        "operationId": "getProjectEdgeReplicationPolicy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -12422,14 +13096,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object"
+                  "$ref": "#/components/schemas/SuccessEnvelope"
                 }
               }
             },
-            "description": "Successful response"
+            "description": "Effective policy loaded"
           },
-          "400": {
+          "404": {
             "content": {
               "application/json": {
                 "schema": {
@@ -12437,27 +13110,7 @@
                 }
               }
             },
-            "description": "Bad request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Forbidden"
+            "description": "Not found"
           }
         },
         "security": [
@@ -12466,21 +13119,20 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/edge/lineages/{lineage_id}/staged-rows",
+        "summary": "Get effective edge replication policy for a project",
         "tags": [
           "Edge replication"
         ]
-      }
-    },
-    "/projects/{project_id}/edge/policy": {
+      },
       "patch": {
-        "operationId": "patchProjectsProjectIdEdgePolicy",
+        "operationId": "patchProjectEdgeReplicationPolicy",
         "parameters": [
           {
             "in": "path",
             "name": "project_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -12489,14 +13141,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object"
-              }
-            },
-            "multipart/form-data": {
-              "schema": {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/PatchEdgeReplicationPolicyBody"
               }
             }
           },
@@ -12507,12 +13152,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object"
+                  "$ref": "#/components/schemas/SuccessEnvelope"
                 }
               }
             },
-            "description": "Successful response"
+            "description": "Policy updated"
           },
           "400": {
             "content": {
@@ -12523,26 +13167,6 @@
               }
             },
             "description": "Bad request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Forbidden"
           }
         },
         "security": [
@@ -12551,7 +13175,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/edge/policy",
+        "summary": "Patch project-scoped edge replication policy",
         "tags": [
           "Edge replication"
         ]
@@ -12928,7 +13552,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Claim an edge registry schema review (queued \u2192 in_review)",
+        "summary": "Claim an edge registry schema review (queued → in_review)",
         "tags": [
           "Edge replication"
         ]
@@ -13061,6 +13685,63 @@
           }
         ],
         "summary": "Get a single edge schema registry entry with column bindings",
+        "tags": [
+          "Edge replication"
+        ]
+      }
+    },
+    "/projects/{project_id}/edge/registry/{registry_id}/reconcile": {
+      "post": {
+        "operationId": "reconcileApprovedEdgeRegistry",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "registry_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Reconcile completed"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Repair stale approved registry fan-out for linked lineages",
         "tags": [
           "Edge replication"
         ]
@@ -13333,7 +14014,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Claim an edge schema review (queued \u2192 in_review)",
+        "summary": "Claim an edge schema review (queued → in_review)",
         "tags": [
           "Edge replication"
         ]
@@ -13411,6 +14092,225 @@
         "summary": "Reject an edge schema review; staged rows are discarded",
         "tags": [
           "Edge replication"
+        ]
+      }
+    },
+    "/projects/{project_id}/email-templates": {
+      "get": {
+        "operationId": "listProjectEmailTemplates",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Ok"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": [],
+            "projectIdHeader": []
+          }
+        ],
+        "summary": "List project email template overrides",
+        "tags": [
+          "Projects — Email Templates"
+        ]
+      }
+    },
+    "/projects/{project_id}/email-templates/{type}": {
+      "get": {
+        "operationId": "getProjectEmailTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Ok"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": [],
+            "projectIdHeader": []
+          }
+        ],
+        "summary": "Get project email template override",
+        "tags": [
+          "Projects — Email Templates"
+        ]
+      },
+      "put": {
+        "operationId": "putProjectEmailTemplate",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "type",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "body": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "body"
+                ],
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Ok"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid template"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": [],
+            "projectIdHeader": []
+          }
+        ],
+        "summary": "Upsert project email template override",
+        "tags": [
+          "Projects — Email Templates"
         ]
       }
     },
@@ -14190,7 +15090,7 @@
         ],
         "summary": "Keyset-paginated canonical event feed for a project.",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -14267,7 +15167,7 @@
         ],
         "summary": "List canonical events sharing a correlation_id.",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -14315,7 +15215,7 @@
         ],
         "summary": "SSE real-time stream of canonical events for a project.",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -14392,7 +15292,7 @@
         ],
         "summary": "Get a single canonical event by ID.",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -15834,7 +16734,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Enroll a device into its fleet's integration namespace (operator surface \u2014 no account_id required)",
+        "summary": "Enroll a device into its fleet's integration namespace (operator surface — no account_id required)",
         "tags": [
           "Fleets"
         ]
@@ -17973,7 +18873,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Trigger device discovery for a fleet (operator surface \u2014 no account_id required)",
+        "summary": "Trigger device discovery for a fleet (operator surface — no account_id required)",
         "tags": [
           "Fleets"
         ]
@@ -18103,14 +19003,15 @@
       }
     },
     "/projects/{project_id}/fleets/{fleet_id}/edge/policy": {
-      "patch": {
-        "operationId": "patchProjectsProjectIdFleetsFleetIdEdgePolicy",
+      "get": {
+        "operationId": "getFleetEdgeReplicationPolicy",
         "parameters": [
           {
             "in": "path",
             "name": "project_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -18119,6 +19020,62 @@
             "name": "fleet_id",
             "required": true,
             "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Effective policy loaded"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Get effective edge replication policy for a fleet",
+        "tags": [
+          "Fleets"
+        ]
+      },
+      "patch": {
+        "operationId": "patchFleetEdgeReplicationPolicy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fleet_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -18127,14 +19084,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "additionalProperties": true,
-                "type": "object"
-              }
-            },
-            "multipart/form-data": {
-              "schema": {
-                "additionalProperties": true,
-                "type": "object"
+                "$ref": "#/components/schemas/PatchEdgeReplicationPolicyBody"
               }
             }
           },
@@ -18145,12 +19095,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object"
+                  "$ref": "#/components/schemas/SuccessEnvelope"
                 }
               }
             },
-            "description": "Successful response"
+            "description": "Policy updated"
           },
           "400": {
             "content": {
@@ -18161,26 +19110,6 @@
               }
             },
             "description": "Bad request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Forbidden"
           }
         },
         "security": [
@@ -18189,7 +19118,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "PATCH /projects/{project_id}/fleets/{fleet_id}/edge/policy",
+        "summary": "Patch fleet-scoped edge replication policy",
         "tags": [
           "Fleets"
         ]
@@ -18577,7 +19506,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Claim a fleet-scoped registry review (queued \u2192 in_review)",
+        "summary": "Claim a fleet-scoped registry review (queued → in_review)",
         "tags": [
           "Fleets"
         ]
@@ -20364,7 +21293,7 @@
         ],
         "summary": "Paginated TSDB logs for a project (requires can_read_logs).",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -24426,7 +25355,7 @@
         ],
         "summary": "Execute QueryScript against project TSDB data",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -24547,7 +25476,7 @@
         ],
         "summary": "Export QueryScript results as a zstd-compressed Arrow IPC stream",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -24603,7 +25532,7 @@
         ],
         "summary": "Get realtime session details",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -24671,7 +25600,7 @@
         ],
         "summary": "End an active realtime session",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -24739,7 +25668,7 @@
         ],
         "summary": "Join an existing realtime session",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -24840,7 +25769,7 @@
         ],
         "summary": "Search project entities",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -24908,7 +25837,7 @@
         ],
         "summary": "GET /projects/{project_id}/shadow-definitions",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       },
       "post": {
@@ -24991,7 +25920,7 @@
         ],
         "summary": "POST /projects/{project_id}/shadow-definitions",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -25084,7 +26013,7 @@
         ],
         "summary": "PATCH /projects/{project_id}/shadow-definitions/{shadow_definition_id}",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -25142,7 +26071,7 @@
         ],
         "summary": "Get PostgreSQL-backed project stats",
         "tags": [
-          "Observability & data"
+          "Observability \u0026 data"
         ]
       }
     },
@@ -25294,7 +26223,7 @@
         ],
         "summary": "Devices in the project with connectivity and metadata filters (paginated, authorized read).",
         "tags": [
-          "Projects \u2014 Status"
+          "Projects — Status"
         ]
       }
     },
@@ -25843,7 +26772,7 @@
         ],
         "summary": "List ticket form definitions for a project",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "post": {
@@ -25919,7 +26848,7 @@
         ],
         "summary": "Create a project-scoped ticket form definition (YAML in, JSON stored)",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -25996,7 +26925,7 @@
         ],
         "summary": "Delete a ticket form definition row",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "get": {
@@ -26071,7 +27000,7 @@
         ],
         "summary": "Get a ticket form definition by id",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "patch": {
@@ -26166,7 +27095,7 @@
         ],
         "summary": "Add next form version from YAML (name must match)",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -26246,7 +27175,7 @@
         ],
         "summary": "List ticket workflow versions for a project",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "post": {
@@ -26322,7 +27251,90 @@
         ],
         "summary": "Create a ticket workflow from JSON",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
+        ]
+      }
+    },
+    "/projects/{project_id}/ticket-workflows/validate": {
+      "post": {
+        "operationId": "validateProjectTicketWorkflow",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketWorkflowCreateRequest"
+              }
+            },
+            "application/yaml": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketWorkflowCreateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectTicketWorkflowValidateResponse"
+                }
+              }
+            },
+            "description": "Validation result (valid may be false)"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid request body or unparsable workflow"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Validate a ticket workflow definition without persisting",
+        "tags": [
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -26409,7 +27421,7 @@
         ],
         "summary": "Delete an inactive workflow version (no tickets referencing)",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "get": {
@@ -26484,7 +27496,7 @@
         ],
         "summary": "Get a ticket workflow version by id",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "patch": {
@@ -26579,7 +27591,7 @@
         ],
         "summary": "Add next workflow version from JSON (name must match)",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -26646,7 +27658,7 @@
         ],
         "summary": "Activate a ticket workflow version",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -26816,7 +27828,7 @@
         ],
         "summary": "List tickets for a project",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "post": {
@@ -26892,7 +27904,7 @@
         ],
         "summary": "Create a ticket",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -26969,7 +27981,7 @@
         ],
         "summary": "Delete a ticket",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "get": {
@@ -27044,7 +28056,7 @@
         ],
         "summary": "Get a ticket",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "patch": {
@@ -27139,7 +28151,104 @@
         ],
         "summary": "Patch ticket fields (title, body, metadata merge)",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
+        ]
+      }
+    },
+    "/projects/{project_id}/tickets/{ticket_id}/assign": {
+      "post": {
+        "operationId": "assignProjectTicket",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketAssignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Assignment applied"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Assign ticket to a user or group",
+        "tags": [
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -27226,7 +28335,103 @@
         ],
         "summary": "Add a ticket tag",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
+        ]
+      }
+    },
+    "/projects/{project_id}/tickets/{ticket_id}/tags/{tag_id}": {
+      "delete": {
+        "operationId": "removeProjectTicketTag",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "tag_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Tag removed"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Ticket or tag not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Remove a ticket tag",
+        "tags": [
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -27313,7 +28518,208 @@
         ],
         "summary": "Transition a ticket",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
+        ]
+      }
+    },
+    "/projects/{project_id}/tickets/{ticket_id}/transitions": {
+      "get": {
+        "operationId": "listProjectTicketTransitions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 10,
+              "maximum": 200,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "offset",
+            "schema": {
+              "minimum": 0,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TicketTransitionListResponse"
+                }
+              }
+            },
+            "description": "Transition history"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "List ticket transition history",
+        "tags": [
+          "Tickets \u0026 workflows"
+        ]
+      }
+    },
+    "/projects/{project_id}/tickets/{ticket_id}/unassign": {
+      "post": {
+        "operationId": "unassignProjectTicket",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "ticket_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/TicketUnassignRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Unassignment applied"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Validation error"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Unassign ticket user or group",
+        "tags": [
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -27361,7 +28767,7 @@
         ],
         "summary": "List workflows for a project",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "post": {
@@ -27418,7 +28824,7 @@
         ],
         "summary": "Create a tenant workflow",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -27475,7 +28881,7 @@
         ],
         "summary": "Delete a tenant workflow",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "get": {
@@ -27530,7 +28936,7 @@
         ],
         "summary": "Get a tenant workflow",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       },
       "patch": {
@@ -27596,7 +29002,7 @@
         ],
         "summary": "Update a tenant workflow",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -27664,7 +29070,7 @@
         ],
         "summary": "Test a tenant workflow with a sample event",
         "tags": [
-          "Tickets & workflows"
+          "Tickets \u0026 workflows"
         ]
       }
     },
@@ -27761,12 +29167,7 @@
   ],
   "servers": [
     {
-      "url": "https://api.ilyama.golain.io/core/api/v1",
-      "description": "Production"
-    },
-    {
-      "url": "http://localhost:19090/core/api/v1",
-      "description": "Local vm-edge / dev"
+      "url": "/core/api/v1"
     }
   ],
   "tags": [
@@ -27795,7 +29196,7 @@
       "name": "OTA"
     },
     {
-      "name": "Observability & data"
+      "name": "Observability \u0026 data"
     },
     {
       "name": "Organizations"
@@ -27807,13 +29208,16 @@
       "name": "Projects"
     },
     {
-      "name": "Projects \u2014 Status"
+      "name": "Projects — Email Templates"
+    },
+    {
+      "name": "Projects — Status"
     },
     {
       "name": "System"
     },
     {
-      "name": "Tickets & workflows"
+      "name": "Tickets \u0026 workflows"
     },
     {
       "name": "Webhooks"

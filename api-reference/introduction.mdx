@@ -3,7 +3,9 @@ title: API introduction
 description: Golain Platform HTTP API — base URL, auth, and OpenAPI reference.
 ---
 
-The **Golain Platform API** is the HTTP surface for orgs, projects, fleets, devices, integrations, edge replication, OTA, and more. It is implemented by [ilyama](https://github.com/golain-io/ilyama) (`services/apis`).
+The **Golain Platform API** is the HTTP surface for orgs, projects, fleets, devices, integrations, edge SQLite replication, OTA, and more. It is implemented by [ilyama](https://github.com/golain-io/ilyama) (`services/apis`).
+
+Edge sync governance routes live under `/projects/{project_id}/edge/*` and are served by the **edge worker** (dedicated `edge_exchange` / `edge_rpc_queue`), not the integration platform substrate.
 
 ## Base URL
 
@@ -13,7 +15,7 @@ The **Golain Platform API** is the HTTP surface for orgs, projects, fleets, devi
 | Self-hosted | `https://api.<your-domain>/core/api/v1` |
 | Local vm-edge | `http://localhost:19090/core/api/v1` |
 
-Paths in this reference are relative to `/core/api/v1`. Endpoints are grouped by resource (Organizations, Projects, Devices, Edge replication, Integrations, OTA, and more) in the sidebar — all **336** operations from the mounted ilyama route surface are included.
+Paths in this reference are relative to `/core/api/v1`. Endpoints are grouped by resource (Organizations, Projects, Devices, Edge replication, Integrations, OTA, and more) in the sidebar — all **351** operations from the mounted ilyama route surface are included.
 
 ## OpenAPI specification
 

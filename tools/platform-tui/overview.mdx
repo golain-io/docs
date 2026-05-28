@@ -77,12 +77,23 @@ golain upgrade
 | Integrations | List accounts & bindings |
 | Users | List org members |
 | Events | Audit, MQTT, TSDB snapshots + live SSE watch |
-| Edge sync | Lineages, schema reviews, staged/written rows |
+| Edge sync (v2) | Lineages, **registry** schema reviews, staged/written rows, policy auto-set on approve |
 | Omega deploy | TUI wizard + `omega scaffold` |
 
 ## TUI highlights
 
-Interactive screens include **Stats & graphs**, **Event stream**, **Data explorer** (QueryScript), **Edge sync** governance, and **Deploy Omega** from device detail. See [TUI guide](/tools/platform-tui/tui-guide).
+Interactive screens include **Stats & graphs**, **Event stream**, **Data explorer** (QueryScript), **Edge sync** governance (v2 registry reviews), and **Deploy Omega** from device detail. See [TUI guide](/tools/platform-tui/tui-guide) and [Edge Sync operator guide](/edge/data-sync/platform-tui-guide).
+
+### Edge sync operator workflow (TUI)
+
+Edge sync is **TUI-first** — there is no `golain edge …` CLI subcommand yet. After setting project context:
+
+1. **Project menu → Edge Sync → Lineages** — inspect per-device table lineages, materialization errors, registry links.
+2. **Edge Sync → Schema Reviews** — lists **registry** reviews (`/edge/registry-reviews/*`, the v2 primary path). Claim (`c`), approve (`a`), or reject (`x`).
+3. On **approve**, the TUI PATCHes project edge policy (`schema_coalescing_mode=project`, `allow_auto_create_device_data_points=true`) then submits column actions derived from the registry schema.
+4. **`d` / `w`** on review or lineage detail — staged vs written (mirror) row payloads.
+
+Use the [HTTP API](/edge/data-sync/api-reference) for coalesced mirror consolidation, registry reconcile, or fleet-scoped policy.
 
 ## vs Device SSH CLI
 

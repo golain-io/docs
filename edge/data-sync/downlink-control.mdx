@@ -1,6 +1,6 @@
 ---
 title: Downlink control messages
-description: pause_lineage, resume_lineage, and url_grant on sync/ingest/control.
+description: pause_lineage, resume_lineage, url_grant, and state_write on sync/ingest/control.
 ---
 
 The cloud sends **control messages** to devices on:
@@ -10,6 +10,18 @@ The cloud sends **control messages** to devices on:
 ```
 
 Devices **subscribe** at QoS 1; **never publish** to this topic.
+
+## How controls reach the device (edge v2)
+
+1. The **edge worker** commits a downlink intent in the transactional outbox.
+2. It stages **`EdgeIngestControlRequestedV2`** on the MQTT downlink exchange (`edge.ingest_control.requested.v1`, domain `edge`).
+3. The **mqtt-broker** consumes from `mqtt_broker_downlink_queue` and publishes the JSON body to the device topic at QoS 1.
+
+This replaces the v1 path where the integration worker owned downlink staging. Wire envelope shape is unchanged — see [ilyama edge-client-guide §6](https://github.com/golain-io/ilyama/blob/main/docs/knowledge/edge-client-guide.md#6-downlink-control-messages--syncingestcontrol).
+
+<Note>
+  `sync/ingest/ack` and `sync/ingest/request` are **device → cloud** topics. They ingress on `edge_ingress_exchange` and are consumed by the edge worker — not delivered as MQTT downlinks.
+</Note>
 
 ## Shared envelope
 
@@ -21,19 +33,21 @@ Devices **subscribe** at QoS 1; **never publish** to this topic.
   "server_watermark": 103,
   "reason": "backpressure: staged row cap exceeded",
   "presigned_url": "https://...",
-  "presigned_url_expires_at": "2026-04-28T09:15:00Z"
+  "presigned_url_expires_at": "2026-04-28T09:15:00Z",
+  "rows": []
 }
 ```
 
-| Field | pause | resume | url_grant |
-|-------|-------|--------|-----------|
-| `control_id` | ✓ | ✓ | ✓ |
-| `control_kind` | ✓ | ✓ | ✓ |
-| `source_table` | ✓ | ✓ | — |
-| `server_watermark` | ✓ | ✓ | — |
-| `reason` | ✓ | — | — |
-| `presigned_url` | — | — | ✓ |
-| `presigned_url_expires_at` | — | — | ✓ |
+| Field | pause | resume | url_grant | state_write |
+|-------|-------|--------|-----------|-------------|
+| `control_id` | ✓ | ✓ | ✓ | ✓ |
+| `control_kind` | ✓ | ✓ | ✓ | ✓ |
+| `source_table` | ✓ | ✓ | — | ✓ |
+| `server_watermark` | ✓ | ✓ | — | — |
+| `reason` | ✓ | — | — | — |
+| `presigned_url` | — | — | ✓ | — |
+| `presigned_url_expires_at` | — | — | ✓ | — |
+| `rows` | — | — | — | ✓ |
 
 ## Required device behavior (all kinds)
 
@@ -84,29 +98,65 @@ Secondary flow for large backfill or spill objects.
 
 Object max size: **1 GiB**.
 
+## state_write
+
+Cloud-originated desired state for **cloud_authoritative** tables (Pipeline B).
+
+**When sent:**
+
+- Operator calls `POST .../devices/{device_id}/edge/state-tables/{table_id}/rows`
+- Edge worker upserts rows in the cloud state table, then stages a downlink
+
+**Payload:**
+
+```json
+{
+  "control_id": "…",
+  "control_kind": "state_write",
+  "source_table": "device_config",
+  "rows": [
+    {
+      "pk": { "id": 1 },
+      "values": { "mode": "cooling", "setpoint": 21 },
+      "cloud_version": 3
+    }
+  ]
+}
+```
+
+**Device actions:**
+
+1. ACK on `sync/ingest/ack`.
+2. Apply rows to local SQLite using your conflict policy (cloud wins for `cloud_authoritative` tables).
+3. Do not echo the write back as a new journal batch unless your agent design requires it.
+
+→ [HTTP API — state write-back](/edge/data-sync/api-reference#cloud-state-write-back)
+
 ## Protocol diagram
 
 ```
-Cloud                                 Device
-  |                                     |
-  |-- pause_lineage (QoS1) ------------>|
-  |<-- ingest/ack ----------------------|
-  |                                     | stop publish, buffer
-  |                                     |
-  |-- resume_lineage (QoS1) ----------->|
-  |<-- ingest/ack ----------------------|
-  |                                     | drain buffer, resume
+Edge worker                          mqtt-broker                    Device
+  |                                       |                            |
+  |-- EdgeIngestControlRequestedV2 ------> |                            |
+  |   (mqtt_downlink exchange)            |                            |
+  |                                       |-- sync/ingest/control ---->|
+  |                                       |                            | ACK ingest/ack
+  |<-- edge.ingest_ack.received.v2 -------|<-- sync/ingest/ack --------|
+  |   (edge_ingress_exchange)             |                            |
 ```
+
+For `url_grant`, the device also publishes `sync/ingest/request` (finalize) after the HTTP PUT.
 
 ## Omega implementation
 
-Module `sqlite-replication` subscribes to control topic, handles pause/resume in `state/store.go`, ACK via `sync/ingest/ack`.
+Module `sqlite-replication` subscribes to the control topic, handles pause/resume in `state/store.go`, ACK via `sync/ingest/ack`. `state_write` handling depends on your Omega version — confirm against [omega sqlite-replication docs](https://github.com/golain-io/omega).
 
 Verify in logs:
 
 ```
 pause_lineage source_table=device_state watermark=103
 resume_lineage source_table=device_state watermark=150
+state_write source_table=device_config rows=1
 ```
 
 ## Related

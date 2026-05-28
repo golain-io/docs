@@ -1,6 +1,6 @@
 ---
 title: Edge sync HTTP API
-description: REST endpoints for lineages, schema reviews, registry coalescing, and policy.
+description: REST endpoints for lineages, schema reviews, registry coalescing, policy, and cloud state write-back.
 ---
 
 Base path:
@@ -15,20 +15,26 @@ Fleet-scoped registry routes also exist under:
 /core/api/v1/projects/{project_id}/fleets/{fleet_id}/edge/...
 ```
 
+Device-scoped state write-back:
+
+```
+/core/api/v1/projects/{project_id}/devices/{device_id}/edge/...
+```
+
 ## Authentication
 
 - **`Authorization: Bearer`** — user OIDC token (same as console)
 - **`ORG-ID`** header — active organization
-- Mutations require **`Idempotency-Key`** header (forwarded to integration worker RPC)
+- Mutations require **`Idempotency-Key`** header (forwarded to edge worker RPC)
 
 ## Permissions
 
 | Operation | Permission |
 |-----------|------------|
 | GET lineages, reviews, staged/mirror rows | Authorized SQL read (device→project join) |
-| POST claim/approve/reject, DELETE lineage, reset materialization, PATCH policy | **`PROJECT_CAN_MANAGE_DEVICES`** |
+| POST claim/approve/reject, DELETE lineage, reset materialization, PATCH policy, state write-back | **`PROJECT_CAN_MANAGE_DEVICES`** |
 
-OpenAPI source: [ilyama.v1.yaml](https://github.com/golain-io/ilyama/blob/main/services/apis/openapi/ilyama.v1.yaml) (~line 5766+).
+OpenAPI source: [ilyama.v1.yaml](https://github.com/golain-io/ilyama/blob/main/services/apis/openapi/ilyama.v1.yaml).
 
 ## Lineages
 
@@ -59,6 +65,61 @@ curl -s -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
 | POST | `/edge/schema-reviews/{review_id}/reject` | Body: `{ "action_version", "reason"?: string }` |
 
 → [Schema review workflow](/edge/data-sync/schema-review-workflow)
+
+## Cloud state write-back
+
+Push desired rows to a **cloud_authoritative** Pipeline B table. The edge worker upserts cloud state, then stages a **`state_write`** downlink on `sync/ingest/control`.
+
+| Method | Path | Description |
+|--------|------|-------------|
+| POST | `/devices/{device_id}/edge/state-tables/{table_id}/rows` | Write cloud state rows and dispatch device downlink |
+
+`table_id` is the **lineage UUID** (`edge_table_lineages.id`) for the target source table — use `GET /edge/lineages` or lineage detail in golain.
+
+### Request body
+
+```json
+{
+  "rows": [
+    {
+      "pk": { "id": 1 },
+      "values": { "mode": "cooling", "setpoint": 21.0 }
+    }
+  ]
+}
+```
+
+- **1–500 rows** per request
+- Requires **`Idempotency-Key`**
+- Table must be approved with **`cloud_authoritative`** sync authority
+
+### Example
+
+```bash
+curl -s -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -H "Content-Type: application/json" \
+  -d '{"rows":[{"pk":{"id":1},"values":{"mode":"cooling","setpoint":21}}]}' \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/edge/state-tables/$LINEAGE_ID/rows"
+```
+
+### Response
+
+```json
+{
+  "data": {
+    "control_id": "…",
+    "rows_written": 1,
+    "source_table": "device_config"
+  }
+}
+```
+
+The device must ACK `control_id` on `sync/ingest/ack` and apply the rows locally.
+
+→ [Downlink control — state_write](/edge/data-sync/downlink-control#state_write)
 
 ## Registry and coalescing (project scope)
 
@@ -91,29 +152,43 @@ Example:
   "schema_coalescing_mode": "fleet",
   "max_pending_rows_per_lineage": 100000,
   "max_pending_bytes_per_lineage": 1073741824,
-  "resume_threshold_percent": 80
+  "resume_threshold_percent": 80,
+  "allow_auto_create_device_data_points": true
 }
 ```
 
 ## RPC mapping (internal)
 
-HTTP mutations call integration worker RPCs on `platform_exchange` / `integration_rpc_queue`:
+HTTP mutations call **edge worker** RPCs on `edge_exchange` / `edge_rpc_queue`:
 
 | RPC | HTTP |
 |-----|------|
-| `integration.edge_schema_review.claim` | POST .../claim |
-| `integration.edge_schema_review.approve` | POST .../approve |
-| `integration.edge_schema_review.reject` | POST .../reject |
-| `integration.edge_table_lineage.reset_materialization` | POST .../reset-materialization |
-| `integration.edge_table_lineage.delete` | DELETE lineage |
-| `integration.edge_replication_policy.set_coalescing_mode` | PATCH .../policy |
-| `integration.edge_coalesced_mirror.consolidate` | POST .../consolidate |
+| `edge.schema_review.claim` | POST .../claim |
+| `edge.schema_review.approve` | POST .../approve |
+| `edge.schema_review.reject` | POST .../reject |
+| `edge.registry_schema_review.*` | POST .../registry-reviews/... |
+| `edge.table_lineage.reset_materialization` | POST .../reset-materialization |
+| `edge.table_lineage.delete` | DELETE lineage |
+| `edge.replication_policy.set_coalescing_mode` | PATCH .../policy |
+| `edge.coalesced_mirror.consolidate` | POST .../consolidate |
+| `edge.state_table.write_rows` | POST .../devices/.../edge/state-tables/.../rows |
+
+Downlink delivery uses **`EdgeIngestControlRequestedV2`** on the MQTT downlink exchange (consumed by mqtt-broker, not a public HTTP route).
 
 ## Response envelopes
 
 Follow standard ilyama HTTP JSON envelopes — list endpoints return pagination meta; single resources wrap the object. Errors use `core/errs` public messages.
 
+Common state write errors:
+
+| Error | Meaning |
+|-------|---------|
+| `edge_state_not_cloud_authoritative` | Lineage is device-authoritative — cloud cannot push rows |
+| `edge_state_mirror_not_provisioned` | Complete schema review before write-back |
+| `edge_state_write_failed` | TSDB upsert or downlink staging failed |
+
 ## Related
 
 - [Querying synced data](/edge/data-sync/querying-data)
 - [platform-tui Edge Sync](/edge/data-sync/platform-tui-guide)
+- [Downlink control](/edge/data-sync/downlink-control)

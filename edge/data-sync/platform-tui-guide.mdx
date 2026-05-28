@@ -25,7 +25,7 @@ Edge Sync
 │   ├── List (paginated)
 │   └── Detail → staged/written data
 └── Schema Reviews
-    ├── List (filter by status)
+    ├── List (filter: f cycles status)
     └── Detail → claim / approve / reject
 ```
 
@@ -40,6 +40,8 @@ Shows per `(device, source_table)`:
 - Device reference
 - Source table name
 
+Paused lineages show **review may be required** in the list description.
+
 Select a row for **lineage detail**.
 
 ## Lineage detail
@@ -48,17 +50,18 @@ Displays:
 
 - Ingestion status and pause reason hints
 - **Materialization** section — failure count, last error (circuit breaker)
-- Schema version history summary
+- Schema version history summary (device + registry)
 - Column bindings (when approved)
 - Replay intent status
-- Registry / coalesced mirror info (when applicable)
+- Coalesced mirror info (when applicable)
 
 ### Keybindings
 
 | Key | Action |
 |-----|--------|
 | `d` | Open **staged** row data for this lineage |
-| `w` | Open **written** (materialized mirror) data |
+| `w` | Open **written** (materialized mirror or telemetry) data |
+| `v` | Jump to **schema review** when lineage is paused / registry pending |
 | `x` | **Reset materialization** — only when materialization error present |
 | `D` | **Delete lineage** (confirmation prompt) |
 | `r` | Refresh detail |
@@ -75,12 +78,13 @@ Shared viewport for inspecting row payloads.
 |-----|--------|
 | `s` | Switch to **staged** rows |
 | `w` | Switch to **written** rows |
-| `n` / `p` | Next / previous page (mirror-rows API pagination) |
+| `n` / `p` | Next / previous page (staged + mirror pagination) |
 | Scroll | `↑/↓` when viewport focused |
+| `r` | Refresh current mode |
 
-**Staged** reads `GET .../lineages/{id}/staged-rows`.
+**Staged** reads `GET .../lineages/{id}/staged-rows`. Shows both Pipeline A (telemetry) and Pipeline B (row batch) staged payloads with `staging_reason`.
 
-**Written** reads `GET .../lineages/{id}/mirror-rows`. If mirror not provisioned (404), TUI falls back to QueryScript against `telemetry_data_point_value` filtered by device — see [querying data](/edge/data-sync/querying-data).
+**Written** reads `GET .../lineages/{id}/mirror-rows` first. If mirror not provisioned (404), TUI falls back to QueryScript against `telemetry_data_point_value` filtered by device — see [querying data](/edge/data-sync/querying-data). The header shows source: **mirror** or **queryscript**.
 
 ## Schema reviews list
 
@@ -90,6 +94,8 @@ Shows reviews with status:
 - `in_review` — operator working
 - `approved` / `rejected` / `abandoned` — terminal
 
+Press **`f`** to cycle filter: **All → Queued → In Review → Approved → Rejected → Abandoned**.
+
 Select for **review detail**.
 
 ## Schema review detail
@@ -97,42 +103,65 @@ Select for **review detail**.
 | Key | When | Action |
 |-----|------|--------|
 | `c` | status=`queued` | **Claim** review |
-| `a` | status=`in_review` | **Approve** (dev shortcut — single column) |
+| `a` | status=`in_review` | **Approve** (auto-map from registry schema) |
 | `x` | status=`in_review` | **Reject** |
 | `d` | any | Staged data for linked lineage |
 | `w` | any | Written data for linked lineage |
 | `r` | any | Refresh |
 
+### What **`a` auto-approve does
+
+1. PATCHes project edge policy: `schema_coalescing_mode=project`, `allow_auto_create_device_data_points=true`
+2. Loads registry schema columns
+3. Builds column actions:
+   - PK columns → **`mirror`**
+   - Timestamp-like columns (`ts`, `event_ts`, …) → **`ignore`**
+   - Other columns → **`auto_create_and_map`**
+
 <Tip>
-  For production approvals with multiple columns, use the [HTTP API](/edge/data-sync/api-reference) with full `column_actions`. TUI **`a`** is a convenience for single-value demo tables.
+  For production approvals with custom mappings, use the [HTTP API](/edge/data-sync/api-reference) with full `column_actions`. TUI **`a`** is a convenience for standard telemetry + state tables.
 </Tip>
+
+If approve returns **409**, refresh (**`r`**) and retry — often an `action_version` conflict or missing policy route on older API builds.
 
 ## Typical operator session
 
 1. Deploy Omega with [golain scaffold](/tools/platform-tui/omega-deploy) or TUI wizard.
 2. Start Omega on the device; confirm device **connected** in console or `golain devices get`.
 3. **`r`** on Edge Sync menu — refresh lineages.
-4. Open **Schema Reviews** — claim newest `queued`.
-5. **`d`** — confirm staged JSON looks correct.
-6. Approve via API (or **`a`** for trivial tables).
-7. Return to **Lineages** → **`w`** — confirm mirror rows.
-8. **`golain events watch`** in separate terminal for `materialization_failed` events.
+4. Open **Schema Reviews** — press **`f`** until **Queued**, then claim newest.
+5. **`d`** — confirm staged JSON looks correct (telemetry and row batches both land here during review).
+6. Approve via API (or **`a`** for registry-backed auto-map).
+7. Return to **Lineages** → **`w`** — confirm mirror or telemetry rows.
+8. **`golain events watch`** in separate terminal for materialization events.
+
+## Cloud state write-back
+
+The TUI does **not** expose cloud → device state push yet. Use the HTTP API:
+
+```
+POST /projects/{project_id}/devices/{device_id}/edge/state-tables/{table_id}/rows
+```
+
+→ [API reference — cloud state write-back](/edge/data-sync/api-reference#cloud-state-write-back)
 
 ## Not available in TUI yet
 
 Use HTTP API instead:
 
-- Registry schema reviews (`/edge/registry-reviews/*`)
-- Coalesced mirror list and consolidation
-- Project edge policy PATCH (`schema_coalescing_mode`)
+- Cloud state write-back (`state_write` downlink trigger)
+- Coalesced mirror consolidation
+- Registry review approve/reject with **custom** column actions (TUI **`a`** auto-maps from registry; use API for bespoke mappings)
+
+Project edge policy PATCH is invoked automatically by TUI **`a`** but has no dedicated settings screen.
 
 ## CLI alternatives
 
 List lineages as JSON for scripts:
 
 ```bash
-# Requires API exposure or future CLI subcommand — today use curl:
-curl -s -H "Authorization: Bearer $(golain whoami 2>/dev/null)" ...
+curl -s -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/edge/lineages?status=paused"
 ```
 
 Edge Sync is TUI-first; governance mutations map 1:1 to [API reference](/edge/data-sync/api-reference) routes.
@@ -142,3 +171,4 @@ Edge Sync is TUI-first; governance mutations map 1:1 to [API reference](/edge/da
 - [Schema review workflow](/edge/data-sync/schema-review-workflow)
 - [TUI guide (general)](/tools/platform-tui/tui-guide)
 - [Omega deploy](/tools/platform-tui/omega-deploy)
+- [Edge v2 troubleshooting](/edge/data-sync/troubleshooting#edge-v2-cutover)

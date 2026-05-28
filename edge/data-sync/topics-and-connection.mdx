@@ -83,20 +83,21 @@ acme-prod/gw-07/sync/ingest/control
 
 Safe to retry same `batch_id` on MQTT redelivery.
 
-## Broker → worker routing
+## Broker → worker routing (edge v2)
 
-mqtt-broker hook publishes to AMQP `telemetry_ingress_exchange`:
+Client MQTT topics are unchanged. On the server, the mqtt-broker hook publishes to **`edge_ingress_exchange`** (not the legacy `telemetry_ingress_exchange` / integration ingress path):
 
-| Topic pattern | Event |
-|---------------|-------|
-| `sync/rows/batch`, `sync/telemetry/batch` | `telemetry.edge_export_segment.received.v1` |
-| `sync/schema/observe` | `telemetry.edge_schema_observation.received.v1` |
-| `sync/ingest/ack` | `telemetry.edge_ingest_ack.received.v1` |
-| `sync/ingest/request` | `telemetry.edge_ingest_request.received.v1` |
+| Topic pattern | Routing key | Consumer queue |
+|---------------|-------------|----------------|
+| `sync/telemetry/batch` | `edge.telemetry_segment.received.v1` | `edge_telemetry_ingest_stream` |
+| `sync/rows/batch` | `edge.state_segment.received.v1` | `edge_state_ingest_queue` |
+| `sync/schema/observe` | `edge.schema_observation.received.v1` | `edge_meta_queue` |
+| `sync/ingest/ack` | `edge.ingest_ack.received.v1` | `edge_meta_queue` |
+| `sync/ingest/request` | `edge.ingest_request.received.v1` | `edge_meta_queue` |
 
-Worker queue: `QueueEdgeReplicationIngest`.
+The **edge worker** consumes these queues and stages governance events on **`edge_exchange`** (schema reviews, lineage pause/resume, materialization).
 
-Downlink: worker stages `integration.edge_ingest_control.requested.v1` → broker publishes to device's `sync/ingest/control`.
+**Downlink:** edge worker stages `edge.ingest_control.requested.v1` on `mqtt_downlink_exchange` → broker publishes to the device's `sync/ingest/control` topic.
 
 ## Startup checklist (device)
 

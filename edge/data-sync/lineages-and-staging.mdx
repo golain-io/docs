@@ -18,12 +18,23 @@ Examples:
 
 Each lineage has independent status, schema versions, reviews, and materialization counters.
 
+## Two ingest pipelines, one lineage
+
+Every enrolled table maps to a single lineage, but ingest follows one of two MQTT paths:
+
+| Pipeline | MQTT topic | Capture on device | Cloud consumer | Typical destination |
+|----------|------------|-------------------|----------------|-------------------|
+| **A — Telemetry** | `sync/telemetry/batch` | Timestamp cursor, `batch_seq` | Edge worker telemetry ingest stream | Telemetry data points |
+| **B — State rows** | `sync/rows/batch` | Trigger journal, `commit_seq`, `journal_epoch` | Edge worker state ingest queue | Mirror table or `edge_state_*` |
+
+Schema governance, staging, replay, and backpressure are **lineage-scoped** — both pipelines share the same lineage row and review ticket for a given `(device, source_table)`.
+
 ## Lineage status
 
 | Status | Meaning |
 |--------|---------|
 | `active` | Ingest accepts batches; live rows materialize when bindings exist |
-| `paused` | New rows may be **staged** instead of written to mirror; may or may not trigger device downlink |
+| `paused` | New rows may be **staged** instead of written to mirror/telemetry; may or may not trigger device downlink |
 
 Check status in **platform-tui → Edge Sync → Lineages** or `GET /projects/{id}/edge/lineages`.
 
@@ -39,14 +50,21 @@ stateDiagram-v2
 
 ### First batch
 
-1. Worker creates lineage row (usually `active` briefly).
+1. Edge worker creates lineage row (usually `active` briefly).
 2. If schema is unseen and policy requires review → classification `ambiguous`.
 3. Lineage flips to **`paused`**, review **`queued`**, rows go to **`edge_staged_rows`**.
+
+This applies to **both pipelines**:
+
+- **Pipeline A:** telemetry batches stage via `stageTelemetryRowsTSDB`, then governance queues the review.
+- **Pipeline B:** row batches on a paused lineage stage with `staging_reason=schema_review`.
+
+The device keeps publishing during review; only volume backpressure sends `pause_lineage` downlink.
 
 ### After schema approval
 
 1. Mirror table DDL provisioned (`edge_mirror_{device8}_{table}` or coalesced name).
-2. **Replay intent** scheduled — staged rows drain into mirror.
+2. **Replay intent** scheduled — staged rows drain (telemetry-first when both kinds exist).
 3. Lineage **`active`** — subsequent live batches materialize directly.
 
 ### Volume backpressure
@@ -54,7 +72,7 @@ stateDiagram-v2
 When staged row count or bytes exceed policy caps (defaults: **100,000 rows** / **1 GiB** per lineage):
 
 1. Lineage **`paused`**.
-2. Server sends **`pause_lineage`** downlink to device.
+2. Edge worker stages **`EdgeIngestControlRequestedV2`** (`pause_lineage`); mqtt-broker delivers on `sync/ingest/control`.
 3. Device stops publishing that table and buffers locally.
 4. When backlog drops below **80%** of caps, server sends **`resume_lineage`**.
 
@@ -72,9 +90,9 @@ After **5+ permanent** materialization errors on an active lineage:
 
 ### What is staged?
 
-Full row payloads (insert/update/delete operations) as JSON, keyed by:
+Full row payloads (insert/update/delete for Pipeline B; timestamped samples for Pipeline A) as JSON, keyed by:
 
-- `device_id`, `source_table`, `source_commit_seq`
+- `device_id`, `source_table`, `source_commit_seq` or `event_ts`
 - `staging_reason`
 - Inline payload or compressed blob (server-internal)
 
@@ -102,7 +120,7 @@ GET /core/api/v1/projects/{project_id}/edge/lineages/{lineage_id}/staged-rows
 Paginate with `page` and `limit` query params.
 
 <Tip>
-  Staged rows prove the device **is sending data** even when mirror tables are empty — always check staged view before debugging MQTT connectivity.
+  Staged rows prove the device **is sending data** even when mirror tables are empty — always check staged view before debugging MQTT connectivity. After edge v2 cutover, confirm the **edge worker** is running; batches no longer flow through the integration worker.
 </Tip>
 
 ## Related OLTP objects
@@ -115,7 +133,7 @@ Each lineage links to:
 | `edge_schema_reviews` | Open or resolved review tickets |
 | `edge_column_bindings` | Approved mapping: source column → mirror or telemetry |
 | `edge_replay_intents` | Durable replay job after approve |
-| `edge_pending_controls` | Outstanding downlink pause/resume/url_grant |
+| `edge_pending_controls` | Outstanding downlink pause/resume/url_grant/state_write |
 
 ## Deleting a lineage
 
@@ -129,7 +147,7 @@ platform-tui: lineage detail → **`D`** (confirm).
 
 Separate from cloud lineage, Omega persists in **`state.db`**:
 
-- Last published `commit_seq` per table
+- Last published `commit_seq` / `batch_seq` per table
 - `journal_epoch` per table
 - Pause watermarks from downlink controls
 - Local backpressure buffer

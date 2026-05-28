@@ -7,11 +7,11 @@ Edge SQLite sync moves data from a **local SQLite database** on a device into **
 
 ## What gets replicated
 
-| Source | Mechanism | Cloud destination |
-|--------|-----------|---------------------|
-| Mutable state tables (settings, enrollment, config) | SQLite triggers → journal → `sync/rows/batch` | Relational **mirror table** (`edge_mirror_*`) after schema approval |
-| Time-series tables (sensor readings) | Cursor-based batches → `sync/telemetry/batch` | **Telemetry** (`telemetry_data_point_value`) when columns are mapped |
-| Either shape (today on Omega) | Same row-batch path with `strategy: rows` | Mirror table (recommended until telemetry flush ships) |
+| Source | Mechanism | Cloud destination | Pipeline |
+|--------|-----------|-------------------|----------|
+| Time-series tables (sensor readings) | Cursor-based batches → `sync/telemetry/batch` | **Telemetry** (`telemetry_data_point_value`) when columns are mapped | **A** — telemetry ingest stream |
+| Mutable state tables (settings, enrollment, config) | SQLite triggers → journal → `sync/rows/batch` | Relational **mirror table** (`edge_mirror_*`) or **state table** (`edge_state_*`) after schema approval | **B** — state ingest queue |
+| Either shape (today on Omega) | Same row-batch path with `strategy: rows` | Mirror table (recommended until telemetry flush ships) | **B** |
 
 The cloud does **not** store a replica of your SQLite file. It stores **governed projections** you approve column-by-column.
 
@@ -26,18 +26,17 @@ Your application reads and writes a normal SQLite database (`source.db`). Omega'
 On startup the `sqlite-replication` module:
 
 1. Discovers user tables (excludes `sqlite_*` and internal `__omega_*` tables).
-2. Installs `AFTER INSERT/UPDATE/DELETE` triggers that append to `__omega_journal`.
+2. Installs `AFTER INSERT/UPDATE/DELETE` triggers that append to `__omega_journal` (Pipeline B tables).
 3. Computes a **schema fingerprint** (SHA-256 of canonical column metadata).
 
-Each journal entry records `commit_seq`, operation, primary key JSON, full row JSON (except deletes), and `schema_hash`.
+For telemetry tables (Pipeline A), the agent maintains a cursor on the highest `event_ts` included in an accepted batch. For state tables (Pipeline B), each journal entry records `commit_seq`, operation, primary key JSON, full row JSON (except deletes), and `schema_hash`.
 
 ### 3. Publish (device → MQTT)
 
-Every **5 seconds** (or when batch size reaches **512 KiB**), the module:
+Every **5 seconds** (or when batch size reaches **512 KiB**), the module publishes at **QoS 1**:
 
-1. Reads journal entries since the last published `commit_seq`.
-2. Builds a JSON batch with `batch_id` (UUIDv7), `journal_epoch`, and row operations.
-3. Publishes to `{root_topic}/sync/rows/batch` at **QoS 1**.
+- Pipeline A: `sync/telemetry/batch` with `batch_id` (UUIDv7) and monotonic `batch_seq`
+- Pipeline B: `sync/rows/batch` with `batch_id`, `journal_epoch`, and row operations
 
 The device **never** embeds `org_id`, `project_id`, or `device_id` in payloads — the broker derives tenant scope from the mTLS session.
 
@@ -48,15 +47,27 @@ The MQTT broker:
 - Authenticates the device (mTLS or username/password).
 - Enforces topic ACLs (devices cannot publish on `sync/ingest/control`).
 - Strips any untrusted tenant fields from JSON.
-- Forwards to the integration worker via `telemetry.edge_export_segment.received.v1`.
+- Publishes to **`edge_ingress_exchange`** with routing keys for the target pipeline:
 
-### 5. Worker intake (cloud)
+| MQTT topic suffix | Exchange event | Consumer |
+|-------------------|----------------|----------|
+| `sync/telemetry/batch` | `edge.telemetry_segment.received.v1` | Edge worker telemetry ingest stream |
+| `sync/rows/batch` | `edge.state_segment.received.v1` | Edge worker state ingest queue |
+| `sync/schema/observe` | `edge.schema_observation.received.v2` | Edge worker meta queue |
+| `sync/ingest/ack` | `edge.ingest_ack.received.v2` | Edge worker meta queue |
+| `sync/ingest/request` | `edge.ingest_request.received.v2` | Edge worker meta queue |
 
-The integration worker:
+Wire details: [ilyama edge-client-guide](https://github.com/golain-io/ilyama/blob/main/docs/knowledge/edge-client-guide.md).
+
+### 5. Edge worker intake (cloud)
+
+The **edge worker** (not the integration worker) owns all ingest and governance:
 
 1. **Dedupes** on `(device_id, batch_id)`.
-2. Records segment metadata in `edge_export_segments` (Timescale).
+2. Records segment metadata in the batch ledger.
 3. **Upserts a lineage** — one row per `(device_id, source_table)`.
+
+Pipeline A batches with an approved schema publish to the telemetry ready stream for the telemetry ingester. Pipeline B batches on an active lineage materialize to mirror or state tables directly.
 
 ### 6. Schema classification (cloud)
 
@@ -70,6 +81,13 @@ When a batch carries a **new `schema_hash`**:
 | `breaking` | Incompatible change | **Paused** | **Staged** |
 
 Default production policy treats the **first schema** for a table as **ambiguous** → schema review required.
+
+On schema miss, **both pipelines stage first, then advance governance**:
+
+- **Pipeline A (telemetry):** rows land in `edge_staged_rows`, then lineage classification and review queue run.
+- **Pipeline B (rows/batch):** paused lineages stage incoming batches with `staging_reason=schema_review`; active lineages follow the live materialization path.
+
+The device does **not** receive `pause_lineage` for review-only pauses — it keeps publishing while the cloud holds rows.
 
 ### 7. Staging (cloud)
 
@@ -95,12 +113,18 @@ On approve the worker provisions mirror DDL, creates **column bindings**, insert
 
 ### 9. Replay and materialization (cloud)
 
-- **Replay** drains staged rows into the mirror table (post-approve backlog).
-- **Live batches** on an **active** lineage write directly to mirror or telemetry.
+- **Replay** drains staged rows into the mirror table or telemetry (telemetry-first when both kinds exist).
+- **Live batches** on an **active** lineage write directly to mirror, state table, or telemetry.
 
 Mirror tables are named `edge_mirror_{device8}_{table}` (device-scoped) or coalesced names when using [registry coalescing](/edge/data-sync/registry-coalescing).
 
-### 10. Query (operator / product)
+### 10. Downlink control (cloud → device)
+
+When the edge worker needs to pause ingestion, grant a presigned URL, or push cloud-authoritative state, it stages **`EdgeIngestControlRequestedV2`** on the MQTT downlink exchange. The broker delivers the JSON body on `sync/ingest/control` at QoS 1.
+
+→ [Downlink control](/edge/data-sync/downlink-control)
+
+### 11. Query (operator / product)
 
 Query materialized data via:
 
@@ -128,11 +152,12 @@ Schema approval sets lineage **active** in the database but does **not** automat
 
 | Store | Purpose | Operator-visible? |
 |-------|---------|-------------------|
-| `edge_export_segments` | Batch ledger (metadata) | Via API/TUI lineage detail |
+| `edge_export_segments` / batch dedup ledger | Batch metadata and idempotency | Via API/TUI lineage detail |
 | `edge_staged_rows` | Row bodies awaiting materialization | Staged rows API / TUI **`d`** |
 | `edge_table_lineages` | Lineage status (Postgres OLTP) | Lineages list |
 | `edge_schema_reviews` | Review workflow (OLTP) | Schema reviews list |
 | `edge_mirror_*` | Materialized relational rows (TSDB) | Mirror-rows API / TUI **`w`** |
+| `edge_state_*` | Cloud-authoritative state tables (TSDB) | State write-back API |
 | `telemetry_data_point_value` | Mapped telemetry columns | QueryScript / Data explorer |
 
 ## Related pages

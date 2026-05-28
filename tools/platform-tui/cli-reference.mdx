@@ -114,6 +114,37 @@ golain omega scaffold \
 
 Downloads Omega + SQLite deps from CDN, issues MQTT certs, writes `omega-config.yaml` and `omega-env.sh`. See [Omega deploy](/tools/platform-tui/omega-deploy).
 
+## Edge sync (TUI)
+
+Edge SQLite replication governance has **no dedicated CLI subcommand** — use the interactive TUI (**Project menu → Edge Sync**) or the [HTTP API](/edge/data-sync/api-reference).
+
+Requires project context:
+
+```bash
+golain context set --org=my-org --project=my-project
+golain    # TUI → Edge Sync
+```
+
+| TUI screen | Purpose |
+|------------|---------|
+| **Lineages** | Per-device table pipelines; `d` staged rows, `w` mirror rows, `x` reset materialization |
+| **Schema Reviews** | **Registry** reviews (v2); `c` claim, `a` approve (auto PATCH policy + column map), `x` reject |
+
+Scriptable alternatives today — curl against `/edge/registry-reviews` and `/edge/lineages` (same routes the TUI calls):
+
+```bash
+# List registry schema reviews (v2 primary path)
+curl -s -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/edge/registry-reviews?status=queued"
+
+# Claim + approve (production: supply full column_actions from registry schema)
+curl -s -X POST -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  "$API/core/api/v1/projects/$PROJECT_ID/edge/registry-reviews/$REVIEW_ID/claim"
+```
+
+→ Full operator walkthrough: [golain Edge Sync](/edge/data-sync/platform-tui-guide)
+
 ## Release and diagnostics
 
 ```bash

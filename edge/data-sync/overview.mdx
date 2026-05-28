@@ -27,12 +27,14 @@ flowchart LR
   end
   subgraph cloud [Golain cloud]
     B[MQTT broker]
-    W[Integration worker]
+    X[edge_ingress_exchange]
+    W[Edge worker]
     S[(Staged rows)]
     M[(Mirror / telemetry)]
-    O -->|sync/* MQTT QoS 1| B --> W
+    O -->|sync/* MQTT QoS 1| B --> X --> W
     W --> S
     W --> M
+    W -->|EdgeIngestControlRequestedV2| B
   end
   subgraph ops [You]
     TUI[golain Edge Sync]
@@ -63,11 +65,15 @@ flowchart LR
 | Piece | Repository | Role |
 |-------|------------|------|
 | **Omega** `sqlite-replication` module | [golain-io/omega](https://github.com/golain-io/omega) | Triggers, journal, MQTT publish, pause/resume on device |
-| **MQTT broker** | [golain-io/ilyama](https://github.com/golain-io/ilyama) | mTLS auth, topic ACL, ingress to worker queue |
-| **Integration worker** | ilyama | Ingest, classify schema, stage, review RPC, replay, mirror DDL |
+| **MQTT broker** | [golain-io/ilyama](https://github.com/golain-io/ilyama) | mTLS auth, topic ACL, fan-in to `edge_ingress_exchange`, downlink delivery on `sync/ingest/control` |
+| **Edge worker** | ilyama | Ingest (Pipeline A telemetry + Pipeline B state rows), classify schema, stage, review RPC, replay, mirror DDL, cloud state write-back |
 | **HTTP API + golain** | ilyama | Operator governance and inspection |
 
 Reference client: **`ilyama-edge`** (`omega/clients/ilyama-edge.yaml`).
+
+<Note>
+  Edge v2 runs a **dedicated edge worker** on `edge_ingress_exchange` and `edge_exchange`. The integration worker no longer ingests edge sync batches. After upgrading, confirm the edge worker is registered and run `make rabbitmq-topology` so ingress queues exist.
+</Note>
 
 ## Typical first-time flow
 
@@ -79,7 +85,7 @@ Reference client: **`ilyama-edge`** (`omega/clients/ilyama-edge.yaml`).
 6. **Query data** — mirror rows via API/TUI or QueryScript after materialization.
 
 <Note>
-  With default governance policy, the **first batch** from a new table triggers a schema review and the lineage enters **paused** until you approve. The device can keep sending; the cloud **stages** rows server-side during review.
+  With default governance policy, the **first batch** from a new table triggers a schema review and the lineage enters **paused** until you approve. The device can keep sending; the cloud **stages** rows server-side during review (both telemetry and row-batch pipelines).
 </Note>
 
 ## Documentation map
@@ -122,7 +128,7 @@ Document these when planning production rollouts:
 | Omega telemetry batches | `sync/telemetry/batch` flush is not fully implemented — use `strategy: rows` for time-series-shaped tables |
 | Bootstrap snapshot | `snapshot_on_first_run` flag exists but is **not implemented** — only mutations **after** Omega starts replicate |
 | Secondary upload flow | Presigned URL bootstrap/spill path specified but not implemented in Omega |
-| golain TUI approve shortcut | Dev TUI approve mirrors a single column — use HTTP API for full `column_actions` in production |
+| golain TUI approve shortcut | TUI **`a`** auto-maps columns from registry schema — use HTTP API for bespoke `column_actions` |
 | Authz on mirror reads | Product-level authorized reads for mirror tables still evolving |
 
 See [Troubleshooting](/edge/data-sync/troubleshooting) for operational workarounds.
