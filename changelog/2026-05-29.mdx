@@ -1,0 +1,82 @@
+---
+title: "Edge v2: dedicated worker, dual-pipeline staging, and cloud state write-back"
+description: Week of May 29, 2026 — Omega edge runtime v2 rollout.
+---
+
+This release rolls out **edge v2** — a rebuilt ingest path with a dedicated edge worker, two parallel pipelines for telemetry and state rows, and a new API to push desired state from the cloud back to devices.
+
+## New features
+
+### Dedicated edge worker
+
+Edge sync now runs on its own worker bound to `edge_ingress_exchange` and `edge_exchange`, replacing the previous shared integration-worker path. You get faster ingest, clearer ownership of downlink control, and isolated failure domains for edge traffic.
+
+- After upgrading, confirm the edge worker is registered and ingress queues exist.
+- See [Edge sync overview](/edge/data-sync/overview) and [How it works](/edge/data-sync/how-it-works).
+
+### Dual-pipeline ingest with shared staging
+
+Every synced table now flows through one of two pipelines on a shared lineage:
+
+- **Pipeline A — Telemetry** for time-series-shaped tables (`sync/telemetry/batch`).
+- **Pipeline B — State rows** for transactional tables (`sync/rows/batch`).
+
+Schema governance, staging, replay, and backpressure remain lineage-scoped — both pipelines share the same review and lifecycle. Staged rows are preserved during schema review or pause for either pipeline.
+
+→ [Lineages and staging](/edge/data-sync/lineages-and-staging)
+
+### Cloud state write-back API
+
+Push desired rows from the cloud to a device's local SQLite for tables marked **`cloud_authoritative`**:
+
+```
+POST /core/api/v1/projects/{project_id}/devices/{device_id}/edge/state-tables/{table_id}/rows
+```
+
+- 1–500 rows per request, `Idempotency-Key` required.
+- The edge worker upserts cloud state and dispatches a `state_write` downlink that the device ACKs and applies locally.
+- Good for config rollout, setpoints, mode changes, and other cloud-driven desired state.
+
+→ [HTTP API — cloud state write-back](/edge/data-sync/api-reference#cloud-state-write-back) · [Downlink control — state_write](/edge/data-sync/downlink-control#state_write)
+
+### `EdgeIngestControlRequestedV2` downlink path
+
+Downlink control messages (`pause_lineage`, `resume_lineage`, `url_grant`, `state_write`) now flow through a v2 outbox on the MQTT downlink exchange, consumed by the MQTT broker for QoS 1 delivery on `sync/ingest/control`. Wire envelope is unchanged for devices.
+
+→ [Downlink control messages](/edge/data-sync/downlink-control)
+
+## Updates
+
+### Omega scaffold improvements
+
+`golain omega scaffold` and the **Deploy Omega** TUI wizard now make first-time edge setup repeatable:
+
+- `--transport=tls` flag, with automatic fall-back when QUIC is unavailable on a project.
+- `--verify-tables` seeds unique `vrf_*` tables to avoid lineage collisions in shared projects.
+- Wizard now bundles cert issuance, Omega + SQLite extension downloads, and systemd/launchd/OpenRC service setup in one flow.
+
+→ [Omega deploy](/tools/platform-tui/omega-deploy)
+
+### Backpressure defaults
+
+Volume backpressure caps per lineage are now documented and enforced at:
+
+- **100,000 staged rows** or **1 GiB** triggers `pause_lineage`.
+- Auto-resume when the backlog drops below **80%** of caps.
+
+→ [Backpressure](/edge/data-sync/backpressure)
+
+### Materialization circuit breaker
+
+After 5+ permanent materialization errors, a lineage is paused and the device is sent `pause_lineage`. Clear the error state and resume with:
+
+```
+POST /edge/lineages/{lineage_id}/reset-materialization
+```
+
+→ [Lineages and staging](/edge/data-sync/lineages-and-staging)
+
+## Fixes
+
+- Edge sync batches no longer share a queue with integration traffic, so a stuck integration consumer cannot block edge ingest.
+- `sync/ingest/ack` and `sync/ingest/request` are now consistently handled as device→cloud topics on `edge_ingress_exchange`, fixing cases where ACKs were misrouted on busy projects.
