@@ -84,7 +84,7 @@ Shared viewport for inspecting row payloads.
 
 **Staged** reads `GET .../lineages/{id}/staged-rows`. Shows both Pipeline A (telemetry) and Pipeline B (row batch) staged payloads with `staging_reason`.
 
-**Written** reads `GET .../lineages/{id}/mirror-rows` first. If mirror not provisioned (404), TUI falls back to QueryScript against `telemetry_data_point_value` filtered by device — see [querying data](/edge/data-sync/querying-data). The header shows source: **mirror** or **queryscript**.
+**Written** reads `GET .../lineages/{id}/mirror-rows` first. If the lineage is telemetry-backed, TUI falls back to QueryScript against the lineage's `edge_ts_*` hypertable filtered by device — see [querying data](/edge/data-sync/querying-data). The header shows source: **mirror** or **queryscript**.
 
 ## Schema reviews list
 
@@ -132,7 +132,7 @@ If approve returns **409**, refresh (**`r`**) and retry — often an `action_ver
 4. Open **Schema Reviews** — press **`f`** until **Queued**, then claim newest.
 5. **`d`** — confirm staged JSON looks correct (telemetry and row batches both land here during review).
 6. Approve via API (or **`a`** for registry-backed auto-map).
-7. Return to **Lineages** → **`w`** — confirm mirror or telemetry rows.
+7. Return to **Lineages** → **`w`** — confirm relational rows or telemetry results from the lineage's `edge_ts_*` table.
 8. **`golain events watch`** in separate terminal for materialization events.
 
 ## Cloud state write-back

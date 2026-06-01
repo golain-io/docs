@@ -3,7 +3,7 @@ title: Capture strategies
 description: Row journal vs telemetry batches — choosing how tables replicate.
 ---
 
-Omega supports two capture strategies per table. Today **row journal** is production-ready; **telemetry batch** is specified but not fully implemented in Omega.
+Omega supports two capture strategies per table. Use **row journal** for relational/state tables and **telemetry batch** for time-series tables with a stable timestamp column.
 
 ## Row journal (`strategy: rows`)
 
@@ -26,18 +26,18 @@ Omega supports two capture strategies per table. Today **row journal** is produc
 ### When to choose rows
 
 - Table has a primary key and changes over time.
-- You want relational mirror in `edge_mirror_*`.
-- Time-series table until telemetry flush ships — **recommended workaround**.
+- You want relational/state materialization through `mirror-rows`.
+- You need update/delete semantics or cloud-authoritative `state_write` flows.
 
 ### Example tables
 
 - `device_state` — keyed settings
 - `order_events` — append-only event log with PK
-- `sensor_timeseries` — use rows strategy today
+- `sensor_timeseries` — if you need telemetry hypertables, use `strategy: telemetry`
 
 ## Telemetry batch (`strategy: telemetry`)
 
-**Best for:** high-volume time-ordered readings with timestamp column (when implemented).
+**Best for:** high-volume time-ordered readings with a timestamp column.
 
 ### How it works (spec)
 
@@ -48,11 +48,7 @@ Omega supports two capture strategies per table. Today **row journal** is produc
 
 ### Current Omega status
 
-Telemetry flush is a **stub**. Batches are not emitted on the telemetry topic.
-
-**Workaround:** configure time-series tables with `strategy: rows` and approve mirror columns in schema review.
-
-Track: [omega issue #3](https://github.com/golain-io/omega/issues/3).
+Telemetry batches are emitted on `sync/telemetry/batch` and materialize into project- or fleet-scoped `edge_ts_*` hypertables after schema approval.
 
 ## Ignore (`strategy: ignore`)
 
@@ -70,8 +66,8 @@ table_strategies:
 |---|-------------|-----------------|
 | MQTT topic | `sync/rows/batch` | `sync/telemetry/batch` |
 | Dedup | Per row | Per batch + batch_seq |
-| Cloud storage | Mirror table (typical) | Telemetry datapoints (when mapped) |
-| Omega status | **Production** | **Stub** |
+| Cloud storage | `edge_state_*` table (typical) | `edge_ts_*` hypertable |
+| Omega status | **Production** | **Production** |
 | PK required | Yes | Timestamp column |
 
 ## Journal epoch
@@ -80,12 +76,12 @@ If Omega truncates/rebuilds `__omega_journal`, it generates a new **`journal_epo
 
 ## Pre-existing rows
 
-Rows present in SQLite **before** Omega starts are **not** in the journal. `snapshot_on_first_run` is not implemented — only mutations **after** trigger install replicate.
+With `snapshot_on_first_run: true`, Omega seeds existing SQLite rows into its local journal once before switching to normal incremental replication.
 
 To backfill historical data:
 
 - Run application migrations that touch rows after Omega start, or
-- Wait for **bootstrap snapshot** secondary flow (not implemented).
+- Use `snapshot_on_first_run: true` for the built-in one-time local bootstrap; use the secondary/object-upload flow only for larger future spill/bootstrap scenarios.
 
 ## Schema columns on first batch
 

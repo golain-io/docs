@@ -43,9 +43,11 @@ OpenAPI source: [ilyama.v1.yaml](https://github.com/golain-io/ilyama/blob/main/s
 | GET | `/edge/lineages` | List lineages. Query: `device_id`, `fleet_id`, `status`, pagination |
 | GET | `/edge/lineages/{lineage_id}` | Detail + schema versions + bindings |
 | GET | `/edge/lineages/{lineage_id}/staged-rows` | Staged row payloads |
-| GET | `/edge/lineages/{lineage_id}/mirror-rows` | Materialized mirror rows |
+| GET | `/edge/lineages/{lineage_id}/mirror-rows` | Materialized relational/state rows for the lineage |
 | POST | `/edge/lineages/{lineage_id}/reset-materialization` | Clear materialization CB; may resume downlink |
 | DELETE | `/edge/lineages/{lineage_id}` | Remove sync state for device+table |
+
+For telemetry lineages, use `GET /edge/lineages/{lineage_id}` to identify the materialized target and then query the lineage's `edge_ts_*` hypertable through QueryScript.
 
 ### Example — list paused lineages
 
@@ -117,7 +119,7 @@ curl -s -X POST \
 }
 ```
 
-The device must ACK `control_id` on `sync/ingest/ack` and apply the rows locally.
+The device must ACK `control_id` on `sync/ingest/ack`, apply the rows locally, and include `lkcv` on the next row-batch upload for the affected primary keys.
 
 → [Downlink control — state_write](/edge/data-sync/downlink-control#state_write)
 

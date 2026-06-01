@@ -63,7 +63,7 @@ The device keeps publishing during review; only volume backpressure sends `pause
 
 ### After schema approval
 
-1. Mirror table DDL provisioned (`edge_mirror_{device8}_{table}` or coalesced name).
+1. Materialization target provisioned (`edge_state_*` for relational rows, `edge_ts_*` for telemetry).
 2. **Replay intent** scheduled — staged rows drain (telemetry-first when both kinds exist).
 3. Lineage **`active`** — subsequent live batches materialize directly.
 

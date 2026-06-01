@@ -79,7 +79,7 @@ When approving, specify one action per source column:
 
 | Action | Effect |
 |--------|--------|
-| `mirror` | Relational column in `edge_mirror_*` table (`mirror_column_name` optional) |
+| `mirror` | Relational column in the lineage's materialized state table (`mirror_column_name` optional) |
 | `map` | Map to existing `device_data_point_id` → telemetry path |
 | `ignore` | Drop column from cloud projection |
 | `defer` | Leave unbound — lineage may stay paused if required columns deferred |

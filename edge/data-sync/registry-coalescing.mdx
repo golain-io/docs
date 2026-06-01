@@ -3,7 +3,7 @@ title: Registry coalescing
 description: Share schema reviews and mirror tables across devices at project or fleet scope.
 ---
 
-By default, each device gets its own schema review and **device-scoped mirror table** (`edge_mirror_{device8}_{table}`). **Registry coalescing** lets many devices sharing the same table shape reuse one schema decision and one **coalesced mirror**.
+By default, each device gets its own schema review and materialization target. **Registry coalescing** lets many devices sharing the same table shape reuse one schema decision and one **coalesced target**.
 
 ## When to use coalescing
 
@@ -23,16 +23,16 @@ flowchart TD
   D2[Device B batch] --> REG
   REG -->|new hash| RR[Registry schema review]
   REG -->|known approved hash| AUTO[Auto-approve device schema]
-  RR -->|approve| CM[Coalesced mirror edge_mirror_p... or _f...]
+  RR -->|approve| CM[Coalesced target edge_ts_p... / edge_state_p...]
   AUTO --> CM
 ```
 
 1. First device announces hash `H` for table `telemetry_readings` → **registry review** created.
 2. Operator approves with column actions at registry scope.
 3. Second device sends same hash `H` → **device schema auto-approved**, rows materialize to shared mirror.
-4. Physical table name pattern:
-   - Project scope: `edge_mirror_p{project8}_{table}`
-   - Fleet scope: `edge_mirror_f{fleet8}_{table}`
+4. Physical table name pattern depends on the approved destination:
+   - Telemetry: `edge_ts_p{project8}_{table}` or `edge_ts_f{fleet8}_{table}`
+   - Relational/state: `edge_state_p{project8}_{table}` or `edge_state_f{fleet8}_{table}`
 
 ## Policy configuration
 

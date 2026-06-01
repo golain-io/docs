@@ -27,7 +27,7 @@ flowchart TD
 | No lineages at all | MQTT not publishing sync topics | [Connectivity](#connectivity) |
 | Device connected, still no lineages | Edge worker down or v1 topology | [Edge v2 cutover](#edge-v2-cutover) |
 | Lineage paused, review queued | First schema / ambiguous change | [Schema review](#schema-review-issues) |
-| Staged rows growing, no mirror | Not approved or materialization failing | [Materialization](#materialization) |
+| Staged rows growing, no written data | Not approved or materialization failing | [Materialization](#materialization) |
 | Device stopped sending one table | `pause_lineage` downlink | [Backpressure](#backpressure-on-device) |
 | Pre-seeded DB empty in cloud | No snapshot on first run | [Historical data](#historical-data-gaps) |
 | State write-back 403/409 | Wrong authority or missing approve | [State write-back](#state-write-back) |
@@ -149,7 +149,7 @@ Application migration changed DDL → new hash → new review.
 
 ## Materialization
 
-### Approved but mirror empty
+### Approved but written data still empty
 
 **Checklist:**
 
@@ -157,6 +157,7 @@ Application migration changed DDL → new hash → new review.
 2. Materialization error count > 0? — use **`x`** reset after fixing root cause
 3. Edge worker running with TSDB (not integration worker)
 4. Column actions all `ignore`? — re-approve with `mirror` or `auto_create_and_map`
+5. For telemetry lineages, query the lineage's `edge_ts_*` hypertable rather than the legacy shared telemetry table
 
 **API:**
 
@@ -197,7 +198,9 @@ Complete schema review before calling state write-back. Mirror/state DDL is prov
 
 1. Response includes `control_id` — track in `edge_pending_controls` until device ACKs
 2. Device subscribed to `sync/ingest/control`
-3. Omega version implements `state_write` control kind
+3. Omega version implements `state_write` local apply
+4. Verify the target row changed in local SQLite
+5. On the next device upload, confirm the affected PK carries `lkcv`
 
 → [Downlink control](/edge/data-sync/downlink-control#state_write)
 
@@ -257,7 +260,7 @@ If local retention exceeded, incremental sync may gap.
 
 ### Rows existed before Omega start
 
-`snapshot_on_first_run` **not implemented**. Triggers only capture writes after module install.
+If `snapshot_on_first_run` is disabled, triggers only capture writes after module install. Enable `snapshot_on_first_run: true` when you need Omega to seed existing rows once before incremental sync.
 
 **Workarounds:**
 
@@ -304,7 +307,7 @@ Use `golain devices get` for UUID vs name. Use lineage ID from Edge Sync for sta
 | **`f` cycles review filter** | All / Queued / In Review / Approved / Rejected / Abandoned |
 | **`v` from lineage detail** | Jump to schema review when lineage paused |
 | Registry reviews in TUI | Uses registry review API — approve via HTTP for bespoke column actions |
-| Written view falls back to QueryScript | When mirror-rows 404, TUI queries telemetry by device |
+| Written view falls back to QueryScript | When `mirror-rows` is not the right surface for telemetry, TUI queries the lineage's `edge_ts_*` table by device |
 
 ---
 

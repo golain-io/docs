@@ -122,7 +122,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
 
 ### What happens on approve
 
-1. Mirror table DDL created in Timescale (`edge_mirror_{device8}_{table}`).
+1. The lineage's materialization target is created in Timescale (`edge_state_*` for relational rows, `edge_ts_*` for telemetry).
 2. Column bindings persisted.
 3. Replay intent inserted — staged rows drain.
 4. Lineage set **`active`** (if no deferred required columns).

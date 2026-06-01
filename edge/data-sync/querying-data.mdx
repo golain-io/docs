@@ -3,21 +3,34 @@ title: Querying synced data
 description: Read materialized mirror rows, telemetry fallbacks, and QueryScript.
 ---
 
-After schema approval and materialization, synced SQLite data lives in **mirror tables** or **telemetry** — not in the raw staging ledger.
+After schema approval and materialization, synced SQLite data lives in **`edge_state_*`** tables for relational rows and **`edge_ts_*`** hypertables for telemetry — not in the raw staging ledger.
 
-## Mirror tables (relational)
+## Telemetry hypertables (canonical for telemetry)
 
 Physical table naming:
 
 | Coalescing | Pattern | Example |
 |------------|---------|---------|
-| Device-scoped (default) | `edge_mirror_{device8}_{source_table}` | `edge_mirror_a1b2c3d4_device_state` |
-| Project coalesced | `edge_mirror_p{project8}_{table}` | `edge_mirror_p9f8e7d6c_readings` |
-| Fleet coalesced | `edge_mirror_f{fleet8}_{table}` | `edge_mirror_f1a2b3c4d_status` |
+| Project coalesced (recommended) | `edge_ts_p{project8}_{source_table}` | `edge_ts_p9f8e7d6c_vrf_abc123_metrics` |
+| Fleet coalesced | `edge_ts_f{fleet8}_{source_table}` | `edge_ts_f1a2b3c4d_sensor_timeseries` |
+
+Telemetry hypertables always include `device_id` and `event_ts`, plus the approved source columns for that SQLite table. Golain enables Timescale compression on these tables after **1 day**.
+
+Use these tables as the **canonical** read surface for telemetry written through edge replication. The older shared telemetry table is not the primary query surface for the current edge flow.
+
+## State tables (relational)
+
+Physical table naming:
+
+| Coalescing | Pattern | Example |
+|------------|---------|---------|
+| Device-scoped | `edge_state_{device8}_{source_table}` | `edge_state_a1b2c3d4_device_state` |
+| Project coalesced | `edge_state_p{project8}_{table}` | `edge_state_p9f8e7d6c_device_state` |
+| Fleet coalesced | `edge_state_f{fleet8}_{table}` | `edge_state_f1a2b3c4d_status` |
 
 `device8` / `project8` / `fleet8` are truncated hex prefixes of UUIDs.
 
-Rows include platform columns (device_id, ingest metadata) plus mirrored source columns you approved with action **`mirror`**.
+Rows include platform columns (`device_id`, version metadata) plus source columns you approved with action **`mirror`**.
 
 ## HTTP API
 
@@ -25,7 +38,7 @@ Rows include platform columns (device_id, ingest metadata) plus mirrored source 
 GET /core/api/v1/projects/{project_id}/edge/lineages/{lineage_id}/mirror-rows?page=1&limit=100
 ```
 
-Returns paginated JSON rows from the provisioned mirror for that lineage.
+Returns paginated JSON rows from the provisioned relational target for that lineage.
 
 **Staged** (pre-materialization) rows:
 
@@ -41,7 +54,7 @@ Use staged endpoint to debug; use mirror-rows for product queries.
 2. Press **`w`** for written data
 3. Toggle **`s`** / **`w`** in data viewport
 
-If mirror-rows returns 404 (mirror not yet provisioned), TUI builds a **QueryScript** fallback against telemetry — see below.
+If `mirror-rows` returns 404 for a telemetry lineage, the TUI builds a **QueryScript** fallback against the lineage's `edge_ts_*` hypertable — see below.
 
 ## QueryScript (Data explorer)
 
@@ -52,8 +65,8 @@ Example — filter telemetry written from mapped columns:
 ```json
 {
   "version": 2,
-  "from": "telemetry_data_point_value",
-  "select": ["device_id", "ts", "value"],
+  "from": "edge_ts_p9f8e7d6c_vrf_abc123_metrics",
+  "select": ["device_id", "event_ts", "channel", "reading"],
   "where": {
     "and": [
       { "eq": ["device_id", "YOUR-DEVICE-UUID"] }
@@ -63,7 +76,7 @@ Example — filter telemetry written from mapped columns:
 }
 ```
 
-Use **device UUID** (from console/`platform-tui devices get`), not MQTT device name, for telemetry filters.
+Replace the table name with the actual `edge_ts_*` target for your Project or Fleet and use the **device UUID** (from console or `golain devices get`), not the MQTT device name, for filters.
 
 CLI equivalent: run TUI Data explorer or call `POST /projects/{id}/queryscript` via API.
 
@@ -71,9 +84,9 @@ CLI equivalent: run TUI Data explorer or call `POST /projects/{id}/queryscript` 
 
 | You approved with | Query surface |
 |-------------------|---------------|
-| `mirror` action | `mirror-rows` API / `edge_mirror_*` table |
-| `map` action | Telemetry / datapoint APIs |
-| Mixed | Both — join in application layer |
+| `mirror` action on relational rows | `mirror-rows` API / `edge_state_*` table |
+| Telemetry lineage | QueryScript against `edge_ts_*` |
+| Mixed workflow | Read state via `mirror-rows` and telemetry via `edge_ts_*` |
 
 ## Authz note
 
@@ -96,9 +109,16 @@ FROM edge_staged_rows
 WHERE device_id = '...'
 ORDER BY source_commit_seq;
 
--- Mirror (after approve)
-SELECT * FROM edge_mirror_a1b2c3d4_device_state
+-- State table (after approve)
+SELECT * FROM edge_state_a1b2c3d4_device_state
 WHERE device_id = '...'
+LIMIT 20;
+
+-- Telemetry hypertable (canonical telemetry reads)
+SELECT device_id, event_ts, channel, reading
+FROM edge_ts_p9f8e7d6c_vrf_abc123_metrics
+WHERE device_id = '...'
+ORDER BY event_ts DESC
 LIMIT 20;
 ```
 
@@ -112,7 +132,8 @@ Do not expose raw TSDB access to end customers — use API and QueryScript.
 | Lineage `paused` for backpressure? | [Backpressure](/edge/data-sync/backpressure) |
 | Only pre-Omega rows in SQLite? | Trigger new mutations after Omega start |
 | Wrong device UUID in filter? | Use metadata UUID not MQTT name |
-| Column action `ignore` on all fields? | Re-approve with `mirror` actions |
+| Querying legacy `telemetry_data_point_value`? | Switch QueryScript to the lineage's `edge_ts_*` table |
+| Column action `ignore` on all relational fields? | Re-approve with `mirror` actions |
 
 ## Related
 

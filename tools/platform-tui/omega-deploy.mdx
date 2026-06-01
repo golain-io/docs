@@ -38,7 +38,7 @@ golain omega scaffold \
 | `--arch` | host `GOOS_GOARCH` | Target arch (`linux_amd64`, `darwin_arm64`, …) |
 | `--db-path` | — | Existing SQLite source DB (skips sample seed) |
 | `--sample-db` | `false` | Seed demo tables into `source.db` |
-| `--verify-tables` | `false` | Seed unique `vrf_*` tables (avoids lineage collisions in shared projects) |
+| `--verify-tables` | `false` | Seed three unique verification tables: `vrf_*_events`, `vrf_*_state`, and `vrf_*_metrics` |
 | `--out` | `~/.config/golain/omega/{device}` | Output directory |
 | `--channel` | `stable` | Omega CDN channel (`stable`, `latest`, `dev`) |
 | `--transport` | `quic` | MQTT transport (`quic` or `tls`) |
@@ -66,7 +66,7 @@ source ~/.config/golain/omega/sensor-01/omega-env.sh
 ~/.config/golain/omega/sensor-01/omega -client ~/.config/golain/omega/sensor-01/omega-config.yaml
 ```
 
-Then open **Edge Sync** in the TUI to claim schema reviews and confirm lineages appear.
+Then open **Edge Sync** in the TUI to claim schema reviews and confirm lineages appear. With `--verify-tables`, expect three fresh lineages and one telemetry target in `edge_ts_*`.
 
 ### Maintainer verification
 
@@ -77,7 +77,7 @@ cd ilyama/tools/platform-tui
 ./scripts/verify-omega-scaffold.sh
 ```
 
-Requires a valid `golain login` session and at least one org/project/fleet.
+Requires a valid `golain login` session and at least one Organization / Project / Fleet. The script scaffolds `--verify-tables`, starts Omega, waits for fresh lineages, approves the queued review, and confirms staged rows drain.
 
 ## TUI: Deploy Omega wizard
 
@@ -95,7 +95,7 @@ Press **`O`** on device detail to start **Deploy Omega**.
 
 ```
 Deploy Omega — target
-  → Source database (sample vrf_* tables or existing path)
+  → Source database (sample tables, verification `vrf_*` tables, or existing path)
   → Select tables to replicate
   → Per-table capture strategy (rows / telemetry / ignore)
   → Config preview (YAML + env.sh)

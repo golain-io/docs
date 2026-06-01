@@ -127,8 +127,8 @@ Cloud-originated desired state for **cloud_authoritative** tables (Pipeline B).
 **Device actions:**
 
 1. ACK on `sync/ingest/ack`.
-2. Apply rows to local SQLite using your conflict policy (cloud wins for `cloud_authoritative` tables).
-3. Do not echo the write back as a new journal batch unless your agent design requires it.
+2. Apply rows to the local SQLite table for the matching `source_table`.
+3. Persist the supplied `cloud_version` per primary key so the next `sync/rows/batch` upload for those rows carries `lkcv`.
 
 → [HTTP API — state write-back](/edge/data-sync/api-reference#cloud-state-write-back)
 
@@ -149,7 +149,7 @@ For `url_grant`, the device also publishes `sync/ingest/request` (finalize) afte
 
 ## Omega implementation
 
-Module `sqlite-replication` subscribes to the control topic, handles pause/resume in `state/store.go`, ACK via `sync/ingest/ack`. `state_write` handling depends on your Omega version — confirm against [omega sqlite-replication docs](https://github.com/golain-io/omega).
+Module `sqlite-replication` subscribes to the control topic, handles pause/resume in `state/store.go`, ACKs via `sync/ingest/ack`, applies `state_write` rows into the local SQLite database, and records `cloud_version` so the next row-batch upload includes `lkcv` for the touched primary keys.
 
 Verify in logs:
 

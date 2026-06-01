@@ -3,15 +3,15 @@ title: How edge SQLite sync works
 description: End-to-end pipeline from application writes to queryable cloud data.
 ---
 
-Edge SQLite sync moves data from a **local SQLite database** on a device into **Golain-managed storage** in the cloud. The edge agent captures changes; the cloud governs schema and materializes approved rows.
+Edge SQLite sync moves data from a **local SQLite database** on a device into **Golain-managed storage** in the cloud. The edge agent captures changes; the cloud governs schema and materializes approved rows into relational state tables or telemetry hypertables.
 
 ## What gets replicated
 
 | Source | Mechanism | Cloud destination | Pipeline |
 |--------|-----------|-------------------|----------|
-| Time-series tables (sensor readings) | Cursor-based batches → `sync/telemetry/batch` | **Telemetry** (`telemetry_data_point_value`) when columns are mapped | **A** — telemetry ingest stream |
-| Mutable state tables (settings, enrollment, config) | SQLite triggers → journal → `sync/rows/batch` | Relational **mirror table** (`edge_mirror_*`) or **state table** (`edge_state_*`) after schema approval | **B** — state ingest queue |
-| Either shape (today on Omega) | Same row-batch path with `strategy: rows` | Mirror table (recommended until telemetry flush ships) | **B** |
+| Time-series tables (sensor readings) | Cursor-based batches → `sync/telemetry/batch` | Project-scoped **`edge_ts_*`** hypertable by source table (fleet-scoped if you configure fleet coalescing) | **A** — telemetry ingest stream |
+| Mutable state tables (settings, enrollment, config) | SQLite triggers → journal → `sync/rows/batch` | Relational **`edge_state_*`** table after schema approval | **B** — state ingest queue |
+| Mixed verification DBs | `vrf_*_events` + `vrf_*_state` over row batches, `vrf_*_metrics` over telemetry batches | One lineage per source table, with telemetry and state materialized independently | **A + B** |
 
 The cloud does **not** store a replica of your SQLite file. It stores **governed projections** you approve column-by-column.
 
@@ -67,7 +67,7 @@ The **edge worker** (not the integration worker) owns all ingest and governance:
 2. Records segment metadata in the batch ledger.
 3. **Upserts a lineage** — one row per `(device_id, source_table)`.
 
-Pipeline A batches with an approved schema publish to the telemetry ready stream for the telemetry ingester. Pipeline B batches on an active lineage materialize to mirror or state tables directly.
+Pipeline A batches with an approved schema publish to the telemetry ready stream for the telemetry ingester. Pipeline B batches on an active lineage materialize to `edge_state_*` directly.
 
 ### 6. Schema classification (cloud)
 
@@ -97,7 +97,7 @@ While lineage is **paused** or materialization is blocked, row bodies are stored
 |------------------|---------|
 | `schema_review` | Waiting for operator approval |
 | `lineage_paused` | Volume backpressure or circuit breaker |
-| `materialization_failed` | Transient mirror write error before pause confirmed |
+| `materialization_failed` | Transient materialization write error before pause confirmed |
 
 Staging is **server-side**. The device may continue publishing during schema review; the cloud holds rows until you approve.
 
@@ -109,14 +109,14 @@ An operator:
 2. Inspects staged sample rows.
 3. **Approves** with **column actions** (`mirror`, `map`, `ignore`, …) or **rejects**.
 
-On approve the worker provisions mirror DDL, creates **column bindings**, inserts a **replay intent**, and sets lineage **active**.
+On approve the worker provisions the target DDL, creates **column bindings**, inserts a **replay intent**, and sets lineage **active**.
 
 ### 9. Replay and materialization (cloud)
 
-- **Replay** drains staged rows into the mirror table or telemetry (telemetry-first when both kinds exist).
-- **Live batches** on an **active** lineage write directly to mirror, state table, or telemetry.
+- **Replay** drains staged rows into the provisioned telemetry or state target.
+- **Live batches** on an **active** lineage write directly to `edge_ts_*` or `edge_state_*`.
 
-Mirror tables are named `edge_mirror_{device8}_{table}` (device-scoped) or coalesced names when using [registry coalescing](/edge/data-sync/registry-coalescing).
+For the recommended project-coalesced flow, telemetry tables materialize into `edge_ts_p{project8}_{source_table}`. Golain enables Timescale compression on these hypertables with a **1 day** compression policy.
 
 ### 10. Downlink control (cloud → device)
 
@@ -130,7 +130,7 @@ Query materialized data via:
 
 - `GET .../edge/lineages/{id}/mirror-rows`
 - platform-tui **Written** view
-- QueryScript against mirror or telemetry tables
+- QueryScript against the lineage's `edge_ts_*` hypertable for telemetry
 
 → [Querying synced data](/edge/data-sync/querying-data)
 
@@ -156,9 +156,9 @@ Schema approval sets lineage **active** in the database but does **not** automat
 | `edge_staged_rows` | Row bodies awaiting materialization | Staged rows API / TUI **`d`** |
 | `edge_table_lineages` | Lineage status (Postgres OLTP) | Lineages list |
 | `edge_schema_reviews` | Review workflow (OLTP) | Schema reviews list |
-| `edge_mirror_*` | Materialized relational rows (TSDB) | Mirror-rows API / TUI **`w`** |
-| `edge_state_*` | Cloud-authoritative state tables (TSDB) | State write-back API |
-| `telemetry_data_point_value` | Mapped telemetry columns | QueryScript / Data explorer |
+| `edge_state_*` | Materialized relational and cloud-authoritative state rows (TSDB) | Mirror-rows API / TUI **`w`** |
+| `edge_ts_*` | Materialized telemetry hypertables, one per source table and scope | QueryScript / Data explorer |
+| Device data point events | Device-centric telemetry APIs derived from edge writes | Console widgets, device data point APIs |
 
 ## Related pages
 

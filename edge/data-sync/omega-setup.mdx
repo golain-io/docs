@@ -24,7 +24,7 @@ golain omega scaffold \
 This command:
 
 1. Issues or reuses MQTT mTLS certificates
-2. Seeds a sample SQLite DB (or uses `--db-path` for your own)
+2. Seeds a sample SQLite DB, or a three-table verification DB when you pass `--verify-tables` (`vrf_*_events`, `vrf_*_state`, `vrf_*_metrics`)
 3. Downloads **Omega** and **SQLite deps** from `https://tools.ilyama.golain.io/omega/`
 4. Writes `omega-config.yaml`, `omega-env.sh`, and replication triggers
 
@@ -162,13 +162,30 @@ go run ./cmd/omega -client clients/ilyama-edge-sample.yaml
 bash scripts/sample-replication-mutations.sh
 ```
 
-Tables: `order_events`, `device_state`, `sensor_timeseries` — all use `strategy: rows` today.
+Tables: `order_events`, `device_state`, `sensor_timeseries`. Use `rows` for relational/state tables and `telemetry` for time-series tables with a stable timestamp column.
+
+## Multi-table verification with `--verify-tables`
+
+`golain omega scaffold --verify-tables` creates three uniquely named SQLite tables so you can validate a fresh end-to-end sync without colliding with existing lineages in a shared Project:
+
+- `vrf_<suffix>_events` — row-batch verification
+- `vrf_<suffix>_state` — relational/state verification
+- `vrf_<suffix>_metrics` — telemetry verification
+
+This is the fastest way to confirm the full current Omega + ilyama flow:
+
+1. Scaffold with `--verify-tables`
+2. Start Omega
+3. Approve the queued review in **Edge Sync**
+4. Confirm all three lineages appear for the device
+5. Read telemetry from the Project-scoped `edge_ts_*` hypertable for `vrf_<suffix>_metrics`
 
 ## Verify cloud ingest
 
 1. Console or `golain devices get` — device **connected**.
-2. golain TUI → **Edge Sync → Lineages** — lineages appear per table.
+2. golain TUI → **Edge Sync → Lineages** — lineages appear per table. With `--verify-tables`, expect **three** lineages for the device.
 3. Expect schema review **queued** on first batch — [approve workflow](/edge/data-sync/schema-review-workflow).
+4. After approval, expect telemetry for the `vrf_*_metrics` table in the Project's `edge_ts_*` hypertable and relational rows for `vrf_*_state` through `mirror-rows`.
 
 Maintainer e2e script (ilyama):
 

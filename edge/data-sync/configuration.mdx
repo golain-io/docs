@@ -30,8 +30,8 @@ Optional JITR block under `connection.jitr` — see [JITR enrollment](/edge/jitr
 | `state_db_path_env` | — | e.g. `OMEGA_STATE_DB_PATH` — **set in production** |
 | `flush_interval` | `5s` | Batch flush tick |
 | `local_retention_bytes` | 256 MiB | Documented; not fully enforced yet |
-| `table_strategies` | all tables → `rows` | Per-table override — see [capture strategies](/edge/data-sync/capture-strategies) |
-| `snapshot_on_first_run` | `false` | **Not implemented** — flag only |
+| `table_strategies` | all tables → `rows` | Per-table override — set `telemetry` explicitly for time-series tables |
+| `snapshot_on_first_run` | `false` | When `true`, Omega seeds a one-time initial snapshot into its local journal for row and telemetry tables before switching to incremental replication |
 
 ## table_strategies example
 
@@ -45,7 +45,8 @@ sqlite-replication:
     device_state:
       strategy: rows
     sensor_timeseries:
-      strategy: rows    # use rows until telemetry flush ships
+      strategy: telemetry
+      ts_column: ts
     sqlite_internal:
       strategy: ignore
 ```
@@ -55,7 +56,7 @@ sqlite-replication:
 | Strategy | Behavior |
 |----------|----------|
 | `rows` | Trigger journal → `sync/rows/batch` |
-| `telemetry` | Cursor batches → `sync/telemetry/batch` (**stub in Omega**) |
+| `telemetry` | Cursor batches → `sync/telemetry/batch` |
 | `ignore` | Do not replicate |
 
 ## Security capabilities
@@ -89,6 +90,7 @@ Omega stores per table:
 | State | Purpose |
 |-------|---------|
 | `last_published_commit_seq` | Journal cursor |
+| `next_batch_seq` + telemetry cursor | Monotonic telemetry sequencing and resume point |
 | `journal_epoch` | UUIDv7 — changes on journal reinit |
 | `schema_hash` cache | Drift detection |
 | Pause `server_watermark` | Resume after downlink |
@@ -106,7 +108,7 @@ make codegen CLIENT=my-device   # validate only, no build
 
 ## Module discovery
 
-Omega auto-enrolls all non-system tables when `table_strategies` omits a table (defaults to `rows`). Narrow with explicit ignore rules for scratch tables.
+Omega auto-enrolls all non-system tables when `table_strategies` omits a table, and the default strategy is `rows`. Narrow with explicit `ignore` rules for scratch tables and set `telemetry` explicitly where needed.
 
 ## Related
 
