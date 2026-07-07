@@ -1,0 +1,203 @@
+---
+title: Omega Device gRPC setup
+description: Enable the device-grpc module, run the echo example, and verify schema announce.
+---
+
+This guide covers device-side setup for **Device gRPC RPC**: enabling the Omega module, running the bundled echo example, and confirming the platform receives a schema announce.
+
+## Enable the module
+
+Add `device-grpc` to your Omega client or profile YAML:
+
+```yaml
+modules:
+  required:
+    - heartbeat
+    - device-grpc
+
+security:
+  capabilities:
+    heartbeat: true
+    device-grpc: true
+
+device-grpc:
+  qos: 2
+  # bridge_id: my-bridge   # optional; defaults to device id when unset
+```
+
+| Field | Description |
+|-------|-------------|
+| `device-grpc.qos` | MQTT QoS for bridge traffic (default **2**) |
+| `device-grpc.bridge_id` | Identifier the cloud uses to dial this bridge; must match announce payload |
+
+Broker URL, TLS, credentials, and `connection.root_topic` come from the **`connection:`** block — not from `device-grpc`.
+
+<Note>
+  The reference profile is [`omega/profiles/rpc-example.yaml`](https://github.com/golain-io/omega/blob/main/profiles/rpc-example.yaml). A matching client file is [`omega/clients/rpc-example.yaml`](https://github.com/golain-io/omega/blob/main/clients/rpc-example.yaml).
+</Note>
+
+## What the module does
+
+On start, `device-grpc`:
+
+1. **Publishes schema announce** on `{rootTopic}/register/bridge` (and again on MQTT reconnect).
+2. **Starts an mqtt-bridge gRPC listener** when transport is MQTT — serves the bundled `golain.device.v1.EchoService` with gRPC reflection enabled.
+
+If transport is not MQTT (for example `memory` for dev), only the announce runs — no live bridge listener.
+
+## Local quickstart (mosquitto)
+
+**Terminal 1 — broker:**
+
+```bash
+docker run --rm -p 1883:1883 eclipse-mosquitto:2
+```
+
+**Terminal 2 — standalone echo server** (no full Omega runtime):
+
+```bash
+cd omega
+go run ./cmd/device-grpc-run \
+  -broker tcp://127.0.0.1:1883 \
+  -device-id rpc-example \
+  -root-topic omega/rpc-example
+```
+
+The runner logs the embedded `descriptor_digest` and publishes `rpc_schema_announce`.
+
+## Run via Omega + MQTT
+
+Set connection env vars and use the rpc-example profile:
+
+```bash
+export OMEGA_MQTT_BROKER_URL=tcp://127.0.0.1:1883
+export OMEGA_DEVICE_ID=rpc-example
+export OMEGA_ROOT_TOPIC=omega/rpc-example
+# Optional TLS:
+# export OMEGA_MQTT_USERNAME=...
+# export OMEGA_MQTT_PASSWORD=...
+# export OMEGA_TLS_CA_PATH=...
+# export OMEGA_TLS_CERT_PATH=...
+# export OMEGA_TLS_KEY_PATH=...
+
+cd omega
+go run ./cmd/omega -profile profiles/rpc-example.yaml
+# or: go run ./cmd/omega -client clients/rpc-example.yaml
+```
+
+For production, register the device in Golain first and align `OMEGA_ROOT_TOPIC` with the platform-assigned topic prefix and device name — see [How it works — root topic resolution](/edge/device-rpc/how-it-works#root-topic-resolution).
+
+## Verify schema announce
+
+**Topic:** `{rootTopic}/register/bridge`
+
+**Payload** (unsigned):
+
+```json
+{
+  "action": "rpc_schema_announce",
+  "data": {
+    "bridge_id": "rpc-example",
+    "descriptor_digest": "sha256:…",
+    "bridge_type": "grpc"
+  }
+}
+```
+
+When `signed_control.enabled: true`, fields are wrapped in the Omega signed control envelope (`token`, `timestamp`, `nonce`, `signature`).
+
+**Platform-side confirmation:**
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "https://api.ilyama.golain.io/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/services"
+```
+
+A bound device returns `descriptor_digest` and a non-empty `services` array. An unbound device returns empty services until announce + reflection complete.
+
+You can also force reflection from the cloud:
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  "https://api.ilyama.golain.io/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/reflect"
+```
+
+Requires `can_write_device_metadata` on the device.
+
+## Echo example service
+
+The bundled example implements `golain.device.v1.EchoService`:
+
+| Method | Cloud invoke |
+|--------|--------------|
+| `Echo` | Supported (unary) |
+| `EchoClientStream` | Device only — cloud returns 501 |
+| `EchoServerStream` | Device only — cloud returns 501 |
+| `EchoBidiStream` | Device only — cloud returns 501 |
+
+Proto source: [`omega/modules/device-grpc/proto/golain/device/v1/echo.proto`](https://github.com/golain-io/omega/blob/main/modules/device-grpc/proto/golain/device/v1/echo.proto).
+
+**Example invoke** (after platform binding):
+
+```bash
+curl -sS -X POST \
+  "https://api.ilyama.golain.io:8082/projects/$PROJECT_ID/devices/$DEVICE_ID/golain.device.v1.EchoService/Echo" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Connect-Protocol-Version: 1" \
+  -d '{"message":"hello from cloud"}'
+```
+
+→ Full caller guide: [Invoking methods](/edge/device-rpc/invoking-methods)
+
+## Bring your own gRPC service
+
+1. Define `.proto` services and generate Go stubs.
+2. Register your service on a gRPC server with **gRPC reflection** enabled (required for platform schema registration).
+3. Replace or extend the echo server in your Omega module build.
+4. Regenerate embedded descriptors:
+
+   ```bash
+   cd omega
+   make rpc-generate
+   ```
+
+   This updates `gen/` and `bridge/descriptors.pb` (used for stable `descriptor_digest` in announce).
+
+5. Deploy the device. On connect, announce publishes the new digest; the platform reflects and binds automatically.
+
+<Warning>
+  Any proto change produces a new `descriptor_digest`. Devices on old firmware keep their previous binding until they announce the new digest. Plan OTA rollouts accordingly; use `POST .../rpc/reflect` to verify binding after upgrade.
+</Warning>
+
+## Generate protos (development)
+
+```bash
+cd omega
+make rpc-generate
+go test ./modules/device-grpc/...
+```
+
+## Memory transport (announce only)
+
+For testing announce without a live broker listener:
+
+```yaml
+connection:
+  transport: memory
+```
+
+Copy `profiles/rpc-example.yaml`, set `connection.transport: memory`, and run Omega. Schema announce logic runs; mqtt-bridge listener is skipped.
+
+## Next steps
+
+- [How it works](/edge/device-rpc/how-it-works) — registration and invoke pipelines
+- [Invoking methods](/edge/device-rpc/invoking-methods) — HTTP API from integrators
+- [Troubleshooting](/edge/device-rpc/troubleshooting) — announce and dial issues

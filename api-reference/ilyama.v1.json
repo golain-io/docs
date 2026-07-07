@@ -146,6 +146,22 @@
         ],
         "type": "object"
       },
+      "AttachEdgeSyncPolicyBody": {
+        "properties": {
+          "device_ids": {
+            "items": {
+              "format": "uuid",
+              "type": "string"
+            },
+            "minItems": 1,
+            "type": "array"
+          }
+        },
+        "required": [
+          "device_ids"
+        ],
+        "type": "object"
+      },
       "CanonicalEventItem": {
         "properties": {
           "action": {
@@ -286,6 +302,46 @@
         "required": [
           "ok",
           "data"
+        ],
+        "type": "object"
+      },
+      "CreateEdgeSyncPolicyBody": {
+        "properties": {
+          "cloud_policy": {
+            "type": "object"
+          },
+          "deployment_notes": {
+            "type": "object"
+          },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "omega_channel": {
+            "enum": [
+              "stable",
+              "latest",
+              "dev"
+            ],
+            "type": "string"
+          },
+          "schema_sources": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "table_strategies": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          }
+        },
+        "required": [
+          "name"
         ],
         "type": "object"
       },
@@ -522,6 +578,13 @@
           "certificate_issued": {
             "type": "boolean"
           },
+          "certificate_key_algorithm": {
+            "enum": [
+              "rsa",
+              "ecdsa"
+            ],
+            "type": "string"
+          },
           "client_id_hint": {
             "type": "string"
           },
@@ -729,6 +792,72 @@
         "required": [
           "pk",
           "values"
+        ],
+        "type": "object"
+      },
+      "EdgeSyncPolicy": {
+        "properties": {
+          "cloud_policy": {
+            "type": "object"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "created_by": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "deployment_notes": {
+            "type": "object"
+          },
+          "description": {
+            "nullable": true,
+            "type": "string"
+          },
+          "id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "omega_channel": {
+            "enum": [
+              "stable",
+              "latest",
+              "dev"
+            ],
+            "type": "string"
+          },
+          "org_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "project_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "schema_sources": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "table_strategies": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "name"
         ],
         "type": "object"
       },
@@ -3017,25 +3146,27 @@
       },
       "ProjectTicketFormCreateRequest": {
         "properties": {
-          "yaml_spec": {
-            "description": "Form definition YAML (normalized to JSON in DB).",
-            "type": "string"
+          "form": {
+            "additionalProperties": true,
+            "description": "Form definition JSON (persisted in project_ticket_form_definitions.spec).",
+            "type": "object"
           }
         },
         "required": [
-          "yaml_spec"
+          "form"
         ],
         "type": "object"
       },
       "ProjectTicketFormPatchRequest": {
         "properties": {
-          "yaml_spec": {
-            "description": "New form version from YAML (name must match existing form).",
-            "type": "string"
+          "form": {
+            "additionalProperties": true,
+            "description": "New form version JSON (name must match existing form).",
+            "type": "object"
           }
         },
         "required": [
-          "yaml_spec"
+          "form"
         ],
         "type": "object"
       },
@@ -3385,6 +3516,15 @@
       },
       "TicketCreateRequest": {
         "properties": {
+          "assigned_group_id": {
+            "description": "Optional initial assignee group (mutually exclusive with assigned_user_id).",
+            "format": "uuid",
+            "type": "string"
+          },
+          "assigned_user_id": {
+            "description": "Optional initial assignee (project member user id; mutually exclusive with assigned_group_id).",
+            "type": "string"
+          },
           "body": {
             "type": "string"
           },
@@ -3586,6 +3726,44 @@
           "path",
           "message"
         ],
+        "type": "object"
+      },
+      "UpdateEdgeSyncPolicyBody": {
+        "minProperties": 1,
+        "properties": {
+          "cloud_policy": {
+            "type": "object"
+          },
+          "deployment_notes": {
+            "type": "object"
+          },
+          "description": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "omega_channel": {
+            "enum": [
+              "stable",
+              "latest",
+              "dev"
+            ],
+            "type": "string"
+          },
+          "schema_sources": {
+            "items": {
+              "type": "object"
+            },
+            "type": "array"
+          },
+          "table_strategies": {
+            "additionalProperties": {
+              "type": "object"
+            },
+            "type": "object"
+          }
+        },
         "type": "object"
       },
       "WriteEdgeStateRowsBody": {
@@ -3841,6 +4019,91 @@
         ]
       }
     },
+    "/me/notifications/{provider_kind}/link": {
+      "post": {
+        "operationId": "postMeNotificationsProviderKindLink",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "POST /me/notifications/{provider_kind}/link",
+        "tags": [
+          "System"
+        ]
+      }
+    },
     "/me/permissions/graph": {
       "get": {
         "operationId": "getMyPermissionGraph",
@@ -3884,6 +4147,160 @@
         "summary": "Get the current user's effective permission graph",
         "tags": [
           "System"
+        ]
+      }
+    },
+    "/notification-event-registry": {
+      "get": {
+        "operationId": "getNotificationEventRegistry",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /notification-event-registry",
+        "tags": [
+          "Notification Event Registry"
+        ]
+      }
+    },
+    "/notifications/msteams/bot/messages": {
+      "post": {
+        "operationId": "postMsteamsBotMessages",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Invoke response (message or loginRequest)"
+          },
+          "401": {
+            "description": "Invalid Bot Framework connector token"
+          }
+        },
+        "security": [],
+        "summary": "Microsoft Teams Bot Framework messaging endpoint",
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/notifications/{provider_kind}/{account_id}/callback": {
+      "post": {
+        "operationId": "postNotificationCallback",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "provider_kind",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Callback handled"
+          },
+          "400": {
+            "description": "Invalid callback payload"
+          },
+          "404": {
+            "description": "Unknown provider or account"
+          }
+        },
+        "security": [],
+        "summary": "Notification action callback (Teams Action.Http, Telegram callback query, etc.)",
+        "tags": [
+          "Notifications"
         ]
       }
     },
@@ -6073,6 +6490,74 @@
         ]
       }
     },
+    "/organizations/integrations/accounts/{account_id}/telegram/chats": {
+      "get": {
+        "operationId": "getOrganizationsIntegrationsAccountsAccountIdTelegramChats",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "account_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /organizations/integrations/accounts/{account_id}/telegram/chats",
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
     "/organizations/integrations/accounts/{account_id}/verify": {
       "post": {
         "operationId": "verifyIntegrationAccount",
@@ -7492,6 +7977,506 @@
             "orgIdHeader": []
           }
         ],
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/organizations/notification-subscriptions": {
+      "get": {
+        "operationId": "getOrganizationsNotificationSubscriptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /organizations/notification-subscriptions",
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "post": {
+        "operationId": "postOrganizationsNotificationSubscriptions",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "POST /organizations/notification-subscriptions",
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/organizations/notification-subscriptions/{id}": {
+      "delete": {
+        "operationId": "deleteOrganizationsNotificationSubscriptionsId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Delete succeeded"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "DELETE /organizations/notification-subscriptions/{id}",
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "get": {
+        "operationId": "getOrganizationsNotificationSubscriptionsId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /organizations/notification-subscriptions/{id}",
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "patch": {
+        "operationId": "patchOrganizationsNotificationSubscriptionsId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "PATCH /organizations/notification-subscriptions/{id}",
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/organizations/notification-subscriptions/{id}/deliveries": {
+      "get": {
+        "operationId": "getOrganizationsNotificationSubscriptionsIdDeliveries",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /organizations/notification-subscriptions/{id}/deliveries",
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/organizations/notification-subscriptions/{id}/test": {
+      "post": {
+        "operationId": "postOrganizationsNotificationSubscriptionsIdTest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "POST /organizations/notification-subscriptions/{id}/test",
         "tags": [
           "Organizations"
         ]
@@ -11282,6 +12267,237 @@
         ]
       }
     },
+    "/projects/{project_id}/dashboards/{dashboard_id}/panels/{dashboard_panel_id}/export": {
+      "post": {
+        "operationId": "exportDashboardPanelData",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "dashboard_panel_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/csv": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "CSV export"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Export dashboard panel query results as CSV (50k row cap)",
+        "tags": [
+          "Observability \u0026 data"
+        ]
+      }
+    },
+    "/projects/{project_id}/dashboards/{dashboard_id}/stream": {
+      "get": {
+        "operationId": "streamDashboard",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "start",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "stop",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fleet_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tag_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "panel_ids",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "description": "SSE stream (text/event-stream)"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Multiplex SSE stream for dashboard panel live updates",
+        "tags": [
+          "Observability \u0026 data"
+        ]
+      }
+    },
+    "/projects/{project_id}/dashboards/{dashboard_id}/stream/session/{session_id}": {
+      "post": {
+        "operationId": "postDashboardStreamSession",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "dashboard_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Session updated"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Update dashboard stream session filters without reconnecting SSE",
+        "tags": [
+          "Observability \u0026 data"
+        ]
+      }
+    },
     "/projects/{project_id}/data": {
       "get": {
         "operationId": "getProjectsProjectIdData",
@@ -12208,6 +13424,108 @@
         ]
       }
     },
+    "/projects/{project_id}/devices/{device_id}/edge/sync-policy": {
+      "delete": {
+        "operationId": "detachEdgeSyncPolicy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Policy detached"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Detach the active edge sync policy from a device",
+        "tags": [
+          "Devices"
+        ]
+      },
+      "get": {
+        "operationId": "getDeviceEdgeSyncPolicyAssignment",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Assignment loaded"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "No active assignment"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Get the active edge sync policy assignment for a device",
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
     "/projects/{project_id}/devices/{device_id}/events": {
       "get": {
         "operationId": "getProjectsProjectIdDevicesDeviceIdEvents",
@@ -12355,6 +13673,259 @@
           }
         ],
         "summary": "GET /projects/{project_id}/devices/{device_id}/events/stream",
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/projects/{project_id}/devices/{device_id}/rpc/reflect": {
+      "post": {
+        "operationId": "postProjectsProjectIdDevicesDeviceIdRpcReflect",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "POST /projects/{project_id}/devices/{device_id}/rpc/reflect",
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/projects/{project_id}/devices/{device_id}/rpc/services": {
+      "get": {
+        "operationId": "getProjectsProjectIdDevicesDeviceIdRpcServices",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /projects/{project_id}/devices/{device_id}/rpc/services",
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
+    "/projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations": {
+      "get": {
+        "operationId": "getProjectsProjectIdDevicesDeviceIdRpcSessionsSessionIdInvocations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations",
         "tags": [
           "Devices"
         ]
@@ -14090,6 +15661,369 @@
           }
         ],
         "summary": "Reject an edge schema review; staged rows are discarded",
+        "tags": [
+          "Edge replication"
+        ]
+      }
+    },
+    "/projects/{project_id}/edge/sync-policies": {
+      "get": {
+        "operationId": "listEdgeSyncPolicies",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Policies listed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "List edge sync policy templates for a project",
+        "tags": [
+          "Edge replication"
+        ]
+      },
+      "post": {
+        "operationId": "createEdgeSyncPolicy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateEdgeSyncPolicyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Policy created"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Create an edge sync policy template",
+        "tags": [
+          "Edge replication"
+        ]
+      }
+    },
+    "/projects/{project_id}/edge/sync-policies/{policy_id}": {
+      "delete": {
+        "operationId": "deleteEdgeSyncPolicy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Policy deleted"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Delete an edge sync policy template",
+        "tags": [
+          "Edge replication"
+        ]
+      },
+      "get": {
+        "operationId": "getEdgeSyncPolicy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Policy loaded"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Get an edge sync policy template",
+        "tags": [
+          "Edge replication"
+        ]
+      },
+      "patch": {
+        "operationId": "updateEdgeSyncPolicy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateEdgeSyncPolicyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Policy updated"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Update an edge sync policy template",
+        "tags": [
+          "Edge replication"
+        ]
+      }
+    },
+    "/projects/{project_id}/edge/sync-policies/{policy_id}/assignments": {
+      "get": {
+        "operationId": "listEdgeSyncPolicyAssignments",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Assignments listed"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "List active device assignments for a sync policy",
+        "tags": [
+          "Edge replication"
+        ]
+      }
+    },
+    "/projects/{project_id}/edge/sync-policies/{policy_id}/attach": {
+      "post": {
+        "description": "Transport mode (quic or tls) is stored on the assignment row and inferred from the\ndevice's issued certificate key algorithm at attach time.\n",
+        "operationId": "attachEdgeSyncPolicy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "policy_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AttachEdgeSyncPolicyBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Policy attached"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Attach a sync policy to one or more devices",
         "tags": [
           "Edge replication"
         ]
@@ -20017,6 +21951,456 @@
         ]
       }
     },
+    "/projects/{project_id}/fleets/{fleet_id}/notification-subscriptions": {
+      "get": {
+        "operationId": "getProjectsProjectIdFleetsFleetIdNotificationSubscriptions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fleet_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /projects/{project_id}/fleets/{fleet_id}/notification-subscriptions",
+        "tags": [
+          "Fleets"
+        ]
+      },
+      "post": {
+        "operationId": "postProjectsProjectIdFleetsFleetIdNotificationSubscriptions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fleet_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/notification-subscriptions",
+        "tags": [
+          "Fleets"
+        ]
+      }
+    },
+    "/projects/{project_id}/fleets/{fleet_id}/notification-subscriptions/{id}": {
+      "delete": {
+        "operationId": "deleteProjectsProjectIdFleetsFleetIdNotificationSubscriptionsId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fleet_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Delete succeeded"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "DELETE /projects/{project_id}/fleets/{fleet_id}/notification-subscriptions/{id}",
+        "tags": [
+          "Fleets"
+        ]
+      },
+      "patch": {
+        "operationId": "patchProjectsProjectIdFleetsFleetIdNotificationSubscriptionsId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fleet_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "PATCH /projects/{project_id}/fleets/{fleet_id}/notification-subscriptions/{id}",
+        "tags": [
+          "Fleets"
+        ]
+      }
+    },
+    "/projects/{project_id}/fleets/{fleet_id}/notification-subscriptions/{id}/test": {
+      "post": {
+        "operationId": "postProjectsProjectIdFleetsFleetIdNotificationSubscriptionsIdTest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fleet_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "POST /projects/{project_id}/fleets/{fleet_id}/notification-subscriptions/{id}/test",
+        "tags": [
+          "Fleets"
+        ]
+      }
+    },
     "/projects/{project_id}/fleets/{fleet_id}/stats": {
       "get": {
         "operationId": "getProjectsProjectIdFleetsFleetIdStats",
@@ -22436,6 +24820,416 @@
         ]
       }
     },
+    "/projects/{project_id}/notification-subscriptions": {
+      "get": {
+        "operationId": "getProjectsProjectIdNotificationSubscriptions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /projects/{project_id}/notification-subscriptions",
+        "tags": [
+          "Projects — Notification Subscriptions"
+        ]
+      },
+      "post": {
+        "operationId": "postProjectsProjectIdNotificationSubscriptions",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "POST /projects/{project_id}/notification-subscriptions",
+        "tags": [
+          "Projects — Notification Subscriptions"
+        ]
+      }
+    },
+    "/projects/{project_id}/notification-subscriptions/{id}": {
+      "delete": {
+        "operationId": "deleteProjectsProjectIdNotificationSubscriptionsId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Delete succeeded"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "DELETE /projects/{project_id}/notification-subscriptions/{id}",
+        "tags": [
+          "Projects — Notification Subscriptions"
+        ]
+      },
+      "patch": {
+        "operationId": "patchProjectsProjectIdNotificationSubscriptionsId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "PATCH /projects/{project_id}/notification-subscriptions/{id}",
+        "tags": [
+          "Projects — Notification Subscriptions"
+        ]
+      }
+    },
+    "/projects/{project_id}/notification-subscriptions/{id}/test": {
+      "post": {
+        "operationId": "postProjectsProjectIdNotificationSubscriptionsIdTest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "POST /projects/{project_id}/notification-subscriptions/{id}/test",
+        "tags": [
+          "Projects — Notification Subscriptions"
+        ]
+      }
+    },
     "/projects/{project_id}/ota/releases": {
       "get": {
         "operationId": "getProjectsProjectIdOtaReleases",
@@ -23158,6 +25952,107 @@
           }
         ],
         "summary": "GET /projects/{project_id}/ota/releases/{release_id}/artifacts/{artifact_id}",
+        "tags": [
+          "OTA"
+        ]
+      }
+    },
+    "/projects/{project_id}/ota/releases/{release_id}/artifacts/{artifact_id}/finalize": {
+      "post": {
+        "operationId": "postProjectsProjectIdOtaReleasesReleaseIdArtifactsArtifactIdFinalize",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "release_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "artifact_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            },
+            "multipart/form-data": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "POST /projects/{project_id}/ota/releases/{release_id}/artifacts/{artifact_id}/finalize",
         "tags": [
           "OTA"
         ]
@@ -25344,7 +28239,7 @@
                 }
               }
             },
-            "description": "TSDB or feature gate unavailable"
+            "description": "TSDB unavailable or role not provisioned"
           }
         },
         "security": [
@@ -25465,7 +28360,7 @@
                 }
               }
             },
-            "description": "TSDB or feature gate unavailable"
+            "description": "TSDB unavailable or role not provisioned"
           }
         },
         "security": [
@@ -25475,6 +28370,52 @@
           }
         ],
         "summary": "Export QueryScript results as a zstd-compressed Arrow IPC stream",
+        "tags": [
+          "Observability \u0026 data"
+        ]
+      }
+    },
+    "/projects/{project_id}/queryscript/schema": {
+      "get": {
+        "operationId": "getQueryScriptSchema",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "scope_entity_type",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SuccessEnvelope"
+                }
+              }
+            },
+            "description": "Schema payload"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Entity-scoped QueryScript table schema for dashboard visual builder",
         "tags": [
           "Observability \u0026 data"
         ]
@@ -25669,6 +28610,82 @@
         "summary": "Join an existing realtime session",
         "tags": [
           "Observability \u0026 data"
+        ]
+      }
+    },
+    "/projects/{project_id}/rpc/descriptors/{digest}": {
+      "get": {
+        "operationId": "getProjectsProjectIdRpcDescriptorsDigest",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "digest",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /projects/{project_id}/rpc/descriptors/{digest}",
+        "tags": [
+          "Device RPC"
         ]
       }
     },
@@ -26846,7 +29863,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Create a project-scoped ticket form definition (YAML in, JSON stored)",
+        "summary": "Create a project-scoped ticket form definition (JSON in, stored in spec)",
         "tags": [
           "Tickets \u0026 workflows"
         ]
@@ -27093,7 +30110,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "Add next form version from YAML (name must match)",
+        "summary": "Add next form version from JSON (name must match)",
         "tags": [
           "Tickets \u0026 workflows"
         ]
@@ -27133,6 +30150,14 @@
             "schema": {
               "type": "integer"
             }
+          },
+          {
+            "description": "Filter by active version flag when present. Omit to skip this filter. Accepted values are true/false, 1/0, or yes/no (case-insensitive). Other values yield HTTP 400.\n",
+            "in": "query",
+            "name": "is_active",
+            "schema": {
+              "type": "boolean"
+            }
           }
         ],
         "responses": {
@@ -27145,6 +30170,16 @@
               }
             },
             "description": "Workflow versions loaded"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid query parameter"
           },
           "401": {
             "content": {
@@ -27662,6 +30697,102 @@
         ]
       }
     },
+    "/projects/{project_id}/ticket-workflows/{workflow_id}/state-labels": {
+      "get": {
+        "description": "Returns persisted ticket_state_labels rows for the workflow version (label key, system_class, color, is_initial, is_terminal, and state_label_id UUID for ticket list filtering).",
+        "operationId": "listProjectTicketWorkflowStateLabels",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Workflow version id (same as GET/PATCH ticket-workflows/{workflow_id}).",
+            "in": "path",
+            "name": "workflow_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "data": {
+                      "properties": {
+                        "items": {
+                          "items": {
+                            "additionalProperties": true,
+                            "type": "object"
+                          },
+                          "type": "array"
+                        }
+                      },
+                      "required": [
+                        "items"
+                      ],
+                      "type": "object"
+                    },
+                    "ok": {
+                      "enum": [
+                        1
+                      ],
+                      "type": "integer"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "data"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "State labels for the workflow version"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Workflow version not found or not readable"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "List FSM state labels for a ticket workflow version",
+        "tags": [
+          "Tickets \u0026 workflows"
+        ]
+      }
+    },
     "/projects/{project_id}/tickets": {
       "get": {
         "operationId": "listProjectTickets",
@@ -27716,10 +30847,19 @@
             }
           },
           {
+            "description": "Filter by a single persisted state label row UUID.",
             "in": "query",
             "name": "state_label_id",
             "schema": {
               "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Comma-separated workflow state label keys (OR). Matching ignores case and non-alphanumeric separators (underscore, space, hyphen), so mat_loss matches MAT LOSS and matloss. MattLoss folds to mattloss and does not match mat_loss.",
+            "in": "query",
+            "name": "labels",
+            "schema": {
               "type": "string"
             }
           },
@@ -29178,6 +32318,9 @@
       "name": "Device JITR"
     },
     {
+      "name": "Device RPC"
+    },
+    {
       "name": "Devices"
     },
     {
@@ -29191,6 +32334,12 @@
     },
     {
       "name": "MDM"
+    },
+    {
+      "name": "Notification Event Registry"
+    },
+    {
+      "name": "Notifications"
     },
     {
       "name": "OTA"
@@ -29209,6 +32358,9 @@
     },
     {
       "name": "Projects — Email Templates"
+    },
+    {
+      "name": "Projects — Notification Subscriptions"
     },
     {
       "name": "Projects — Status"

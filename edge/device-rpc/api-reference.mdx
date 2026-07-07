@@ -1,0 +1,163 @@
+---
+title: Device gRPC RPC API reference
+description: Management HTTP routes, invoke proxy, permissions, and response shapes.
+---
+
+Device gRPC RPC uses two HTTP surfaces:
+
+| Surface | Base | Purpose |
+|---------|------|---------|
+| **Management API** | `/core/api/v1/projects/{project_id}/...` | List services, reflect schema, fetch descriptors, query audit |
+| **Invoke proxy** | `:8082/projects/{project_id}/devices/{device_id}/...` | Call unary gRPC methods |
+
+<Note>
+  The invoke proxy is a separate `net/http` mux inside the apis process. It is **not** listed in the Fiber OpenAPI spec because it uses Connect/gRPC path conventions. Management routes **are** in OpenAPI under the **Device RPC** tag.
+</Note>
+
+OpenAPI source: [ilyama.v1.json](/api-reference/introduction) (synced from [ilyama](https://github.com/golain-io/ilyama/blob/main/services/apis/openapi/ilyama.v1.json)).
+
+## Authentication
+
+All routes require:
+
+- **`Authorization: Bearer`** — user OIDC access token (same as console)
+- **`ORG-ID`** header — active organization UUID
+
+Local dev with `AUTH_BYPASS=true` accepts test tokens per e2e harness configuration.
+
+## Permissions
+
+| Operation | Permission |
+|-----------|------------|
+| `GET .../rpc/services` | `can_invoke_rpc` on device |
+| `GET .../rpc/sessions/{session_id}/invocations` | `can_invoke_rpc` on device |
+| `POST .../rpc/reflect` | `can_write_device_metadata` on device |
+| `GET .../rpc/descriptors/{digest}` | Project-scoped read (standard project auth) |
+| `POST :8082/.../{Service}/{Method}` | `can_invoke_rpc` on device |
+
+## Management routes
+
+### List device services
+
+```
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/services
+```
+
+Returns the bound descriptor digest and parsed service/method metadata for the device.
+
+**Response `data` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `descriptor_digest` | string | Content hash, e.g. `sha256:…` |
+| `services` | array | `{ name, methods[] }` — each method has `name`, `method_type` |
+
+Empty `services` when no schema is bound yet.
+
+---
+
+### Reflect device schema
+
+```
+POST /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/reflect
+```
+
+Forces the platform to reflect gRPC services from the device (when online), register the descriptor if new, and bind the device. Skips device round-trip when the digest is already cached for the project.
+
+**Request body:** empty JSON object `{}` is sufficient.
+
+**Response `data` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `descriptor_id` | string | UUID of registry row |
+| `descriptor_digest` | string | Content-addressed digest |
+| `descriptor_new` | boolean | `true` if a new descriptor was registered |
+| `schema_bound` | boolean | `true` if device binding was updated |
+| `methods_synced` | number | Method metadata rows upserted |
+| `services` | array | Parsed service definitions |
+| `proto_files` | array | `{ name, package }` proto file metadata |
+
+---
+
+### Get project descriptor
+
+```
+GET /core/api/v1/projects/{project_id}/rpc/descriptors/{digest}
+```
+
+Fetches raw descriptor bytes for codegen or inspection. Digest must exist in the project registry.
+
+**Response `data` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `digest` | string | Same as path parameter |
+| `name` | string | Registry descriptor name |
+| `descriptor_bytes` | bytes | Serialized `FileDescriptorSet` |
+
+Use with `buf generate` or internal tooling — not required for basic invoke (the proxy loads descriptors automatically).
+
+---
+
+### List invocation audit trail
+
+```
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations
+```
+
+Query parameters: `page` (default 1), `limit` (default 50).
+
+Returns paginated rows from the project-scoped `rpc_invocations_*` Timescale hypertable for the given `session_id` (passed as `?session_id=` on invoke calls).
+
+**Each item includes:** `time`, `service_name`, `method_name`, `grpc_status_code`, `latency_ms`, `trace_id`, `req_digest`, `resp_digest`.
+
+Raw request/response bodies are never stored.
+
+---
+
+## Invoke proxy
+
+```
+POST https://{api-host}:8082/projects/{project_id}/devices/{device_id}/{Service}/{Method}
+```
+
+**Query:** optional `session_id` (UUID string) for audit grouping.
+
+**Headers:**
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer {token}` |
+| `ORG-ID` | Organization UUID |
+| `Content-Type` | `application/json` (Connect JSON) |
+| `Connect-Protocol-Version` | `1` |
+
+**Body:** JSON object matching the protobuf **request** message for the method.
+
+**Success:** JSON object matching the protobuf **response** message.
+
+**Errors:** JSON envelope `{ "ok": false, "message": "…" }` with appropriate HTTP status.
+
+→ Step-by-step caller guide: [Invoking methods](/edge/device-rpc/invoking-methods)
+
+## Rate limits
+
+Management routes use per-route rate limits (12–64 req/s depending on endpoint). Invoke proxy inherits apis process limits; burst-heavy workloads should implement client-side backoff on `502`/`503`.
+
+## OpenAPI playground
+
+These management routes appear in the **API Reference** tab under **Device RPC**:
+
+- `POST /projects/{project_id}/devices/{device_id}/rpc/reflect`
+- `GET /projects/{project_id}/devices/{device_id}/rpc/services`
+- `GET /projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations`
+- `GET /projects/{project_id}/rpc/descriptors/{digest}`
+
+The invoke proxy is documented here and in [Invoking methods](/edge/device-rpc/invoking-methods) — use curl or a Connect client against port **8082**.
+
+## Related
+
+- [Invoking methods](/edge/device-rpc/invoking-methods) — curl examples and error codes
+- [How it works](/edge/device-rpc/how-it-works) — registration and relay pipelines
+- [Troubleshooting](/edge/device-rpc/troubleshooting) — diagnostic guide
