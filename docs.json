@@ -59,7 +59,7 @@
             "pages": [
               "console/overview",
               "console/fleets-and-devices",
-              "console/ota",
+              "console/edge-sync",
               "console/integrations",
               "console/settings"
             ]
@@ -120,6 +120,8 @@
           {
             "group": "Edge agent (Omega)",
             "pages": [
+              "console/edge-sync",
+              "edge/data-sync/console-deployment",
               "tools/platform-tui/omega-deploy",
               "edge/data-sync/omega-setup",
               "edge/data-sync/configuration",

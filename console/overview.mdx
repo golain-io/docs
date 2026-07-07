@@ -3,7 +3,7 @@ title: Console overview
 description: Navigate the Golain web console — org scope, modules, and mock development mode.
 ---
 
-The **Golain Platform Web** (`pw`) is the browser UI for managing organizations, projects, fleets, devices, OTA, integrations, and settings.
+The **Golain Platform Web** (`pw`) is the browser UI for managing organizations, projects, fleets, devices, edge replication, integrations, and settings.
 
 ## Access the console
 
@@ -34,9 +34,8 @@ Routes follow `/:org_id/:project_id/<feature>`. Changing org or project updates 
 |--------|---------|
 | **Home** | Project dashboard and shortcuts |
 | **Fleets & devices** | Fleet CRUD, device list, device detail, certificates |
-| **OTA updates** | Releases, deployments, rollout status |
+| **Edge Sync** | SQLite replication policies, governance, lineages |
 | **Connections** | Integration accounts and bindings |
-| **Definitions** | Data points, shadows, contexts |
 | **Dashboard** | Panel visualizations |
 | **Rule engine / Quick rules** | Automation pipelines |
 | **Logs & activities** | Audit and alert views |
@@ -68,7 +67,7 @@ Many console actions have CLI equivalents in [platform-tui](/tools/platform-tui/
   <Card title="Fleets & devices" icon="server" href="/console/fleets-and-devices">
     Create fleets, register devices, view MQTT details.
   </Card>
-  <Card title="OTA updates" icon="rocket" href="/console/ota">
-    Ship firmware to tagged devices.
+  <Card title="Edge Sync" icon="database" href="/console/edge-sync">
+    Replicate SQLite from devices — policies, bundles, governance.
   </Card>
 </CardGroup>
