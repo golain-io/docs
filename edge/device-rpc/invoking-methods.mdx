@@ -5,6 +5,8 @@ description: Call unary gRPC methods on devices from the cloud over HTTP Connect
 
 Cloud callers invoke device methods through a dedicated **RPC proxy** on port **8082**. The proxy authenticates your user token, transcodes JSON to protobuf, relays the call over MQTT to the device, and returns a JSON response.
 
+For offline-tolerant or retry-friendly workflows, use [Queued invoke](/edge/device-rpc/queued-invoke) (`/enqueue/{Service}/{Method}`) instead of blocking on the device.
+
 <Warning>
   Invoke uses port **8082**, not the main API port (typically 443 or `19090` in local dev). Management routes (list services, reflect, audit) stay on `/core/api/v1/...`.
 </Warning>
@@ -192,6 +194,7 @@ Each row includes `service_name`, `method_name`, `grpc_status_code`, `latency_ms
 
 ## Related
 
+- [Queued invoke](/edge/device-rpc/queued-invoke) — async delivery when device may be offline
 - [API reference](/edge/device-rpc/api-reference) — all management endpoints
 - [How it works](/edge/device-rpc/how-it-works) — invoke pipeline detail
 - [Omega setup](/edge/device-rpc/omega-setup) — device-side configuration

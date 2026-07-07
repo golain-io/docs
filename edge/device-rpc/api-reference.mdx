@@ -7,8 +7,9 @@ Device gRPC RPC uses two HTTP surfaces:
 
 | Surface | Base | Purpose |
 |---------|------|---------|
-| **Management API** | `/core/api/v1/projects/{project_id}/...` | List services, reflect schema, fetch descriptors, query audit |
-| **Invoke proxy** | `:8082/projects/{project_id}/devices/{device_id}/...` | Call unary gRPC methods |
+| **Management API** | `/core/api/v1/projects/{project_id}/...` | List services, reflect schema, fetch descriptors, query audit, **poll queued calls** |
+| **Invoke proxy** | `:8082/projects/{project_id}/devices/{device_id}/...` | Call unary gRPC methods (sync) |
+| **Enqueue proxy** | `:8082/projects/{project_id}/devices/{device_id}/enqueue/...` | Queue unary calls for durable delivery |
 
 <Note>
   The invoke proxy is a separate `net/http` mux inside the apis process. It is **not** listed in the Fiber OpenAPI spec because it uses Connect/gRPC path conventions. Management routes **are** in OpenAPI under the **Device RPC** tag.
@@ -31,9 +32,15 @@ Local dev with `AUTH_BYPASS=true` accepts test tokens per e2e harness configurat
 |-----------|------------|
 | `GET .../rpc/services` | `can_invoke_rpc` on device |
 | `GET .../rpc/sessions/{session_id}/invocations` | `can_invoke_rpc` on device |
+| `GET .../rpc/queued/{call_id}` | `can_invoke_rpc` on device |
 | `POST .../rpc/reflect` | `can_write_device_metadata` on device |
 | `GET .../rpc/descriptors/{digest}` | Project-scoped read (standard project auth) |
 | `POST :8082/.../{Service}/{Method}` | `can_invoke_rpc` on device |
+| `POST :8082/.../enqueue/{Service}/{Method}` | `can_invoke_rpc` on device |
+
+<Warning>
+  Queued enqueue uses **at-least-once** delivery to the device. Callers should send `Idempotency-Key` on enqueue retries; **devices must implement handler idempotency** — see [Queued invoke](/edge/device-rpc/queued-invoke).
+</Warning>
 
 ## Management routes
 
@@ -116,6 +123,32 @@ Raw request/response bodies are never stored.
 
 ---
 
+### Get queued RPC call status
+
+```
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}
+```
+
+Returns lifecycle state and, when complete, gRPC status plus **base64-encoded** protobuf response bytes.
+
+**Response `data` fields:**
+
+| Field | Description |
+|-------|-------------|
+| `call_id` | UUID |
+| `state` | `pending`, `in_flight`, `failed`, `succeeded`, `expired`, or `dlq` |
+| `service_name`, `method_name` | Target method |
+| `attempts` | Delivery attempts |
+| `expires_at` | TTL deadline |
+| `next_attempt_at` | Scheduled retry (when `failed`) |
+| `grpc_status_code`, `grpc_message` | Device gRPC result (when available) |
+| `response` | Base64 protobuf response (when `succeeded`) |
+| `last_error` | Platform/bridge error text |
+
+→ Step-by-step guide: [Queued invoke](/edge/device-rpc/queued-invoke)
+
+---
+
 ## Invoke proxy
 
 ```
@@ -141,6 +174,22 @@ POST https://{api-host}:8082/projects/{project_id}/devices/{device_id}/{Service}
 
 → Step-by-step caller guide: [Invoking methods](/edge/device-rpc/invoking-methods)
 
+### Enqueue proxy (async delivery)
+
+```
+POST https://{api-host}:8082/projects/{project_id}/devices/{device_id}/enqueue/{Service}/{Method}
+```
+
+**Query:** optional `ttl_seconds` (default **900**, clamped **60**–**86400**).
+
+**Headers:** same as sync invoke, plus recommended **`Idempotency-Key`** on enqueue.
+
+**Response** (`202 Accepted`): `{ "call_id", "state", "expires_at" }`.
+
+Poll completion via `GET .../rpc/queued/{call_id}` on the management API.
+
+→ Full guide: [Queued invoke](/edge/device-rpc/queued-invoke)
+
 ## Rate limits
 
 Management routes use per-route rate limits (12–64 req/s depending on endpoint). Invoke proxy inherits apis process limits; burst-heavy workloads should implement client-side backoff on `502`/`503`.
@@ -149,15 +198,17 @@ Management routes use per-route rate limits (12–64 req/s depending on endpoint
 
 These management routes appear in the **API Reference** tab under **Device RPC**:
 
+- `GET /projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}`
 - `POST /projects/{project_id}/devices/{device_id}/rpc/reflect`
 - `GET /projects/{project_id}/devices/{device_id}/rpc/services`
 - `GET /projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations`
 - `GET /projects/{project_id}/rpc/descriptors/{digest}`
 
-The invoke proxy is documented here and in [Invoking methods](/edge/device-rpc/invoking-methods) — use curl or a Connect client against port **8082**.
+The invoke and enqueue proxies are documented here and in [Invoking methods](/edge/device-rpc/invoking-methods) / [Queued invoke](/edge/device-rpc/queued-invoke) — use curl or a Connect client against port **8082**.
 
 ## Related
 
+- [Queued invoke](/edge/device-rpc/queued-invoke) — enqueue, poll, idempotency
 - [Invoking methods](/edge/device-rpc/invoking-methods) — curl examples and error codes
 - [How it works](/edge/device-rpc/how-it-works) — registration and relay pipelines
 - [Troubleshooting](/edge/device-rpc/troubleshooting) — diagnostic guide

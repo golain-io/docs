@@ -13678,6 +13678,90 @@
         ]
       }
     },
+    "/projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}": {
+      "get": {
+        "operationId": "getProjectsProjectIdDevicesDeviceIdRpcQueuedCallId",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "GET /projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}",
+        "tags": [
+          "Devices"
+        ]
+      }
+    },
     "/projects/{project_id}/devices/{device_id}/rpc/reflect": {
       "post": {
         "operationId": "postProjectsProjectIdDevicesDeviceIdRpcReflect",

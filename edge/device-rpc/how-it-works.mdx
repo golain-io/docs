@@ -108,6 +108,42 @@ sequenceDiagram
 
 Optional `?session_id=` on the invoke URL groups traces for later queries via the management API.
 
+## Queued delivery
+
+When a caller uses the **enqueue** path on `:8082`, the platform persists the request in `rpc_queued_calls` and a background runner delivers it via the same `InvokeDeviceBridge` relay as sync invoke.
+
+```mermaid
+sequenceDiagram
+  participant Client as HTTP client
+  participant Proxy as apis rpcproxy :8082
+  participant Worker as RPC domain worker
+  participant PG as Postgres
+  participant Broker as mqtt-broker pool
+  participant Dev as Device gRPC
+
+  Client->>Proxy: POST .../enqueue/Service/Method
+  Proxy->>Worker: EnqueueDeviceRPCCall
+  Worker->>PG: INSERT rpc_queued_calls pending
+  Proxy-->>Client: 202 call_id state expires_at
+
+  loop Runner poll or device reconnect
+    Worker->>PG: Claim due row in_flight
+    Worker->>Broker: InvokeDeviceBridge
+    Broker->>Dev: gRPC unary
+    Dev-->>Broker: Response
+    Worker->>PG: Mark succeeded or failed
+  end
+
+  Client->>Proxy: GET rpc/queued/call_id
+  Proxy-->>Client: state grpc_status response
+```
+
+Queued RPC is **at-least-once**: stale `in_flight` rows are reclaimed after **120 s** and retried; the platform does not pass `call_id` to the device.
+
+<Warning>
+  Device handlers must be **idempotent** when called through the queued path. See [Queued invoke](/edge/device-rpc/queued-invoke).
+</Warning>
+
 ## MQTT bridge wire protocol
 
 Between cloud dialer and device listener, **mqtt-bridge** frames gRPC over MQTT:
@@ -142,6 +178,7 @@ Device-side streaming over mqtt-bridge still works for local or custom tooling; 
 
 ## Related
 
+- [Queued invoke](/edge/device-rpc/queued-invoke) — enqueue, poll, idempotency
 - [Omega setup](/edge/device-rpc/omega-setup) — enable the module and verify announce
 - [Invoking methods](/edge/device-rpc/invoking-methods) — HTTP caller guide
 - [Troubleshooting](/edge/device-rpc/troubleshooting) — when registration or invoke fails

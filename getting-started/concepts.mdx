@@ -77,7 +77,7 @@ Devices running Omega with the **SQLite replication** module can mirror local da
 
 ## Device gRPC RPC
 
-Devices with the **`device-grpc`** Omega module expose protobuf/gRPC services tunneled over MQTT. Cloud callers invoke unary methods via HTTP on port **8082**; the platform registers schemas automatically when the device announces. See [Device gRPC RPC](/edge/device-rpc/overview). This is separate from legacy [shell RPC](/edge/remote-control) (`exec:<command>` over control topics).
+Devices with the **`device-grpc`** Omega module expose protobuf/gRPC services tunneled over MQTT. Cloud callers invoke unary methods via HTTP on port **8082** (sync) or enqueue calls for durable delivery when devices are offline — see [Queued invoke](/edge/device-rpc/queued-invoke). **Queued delivery is at-least-once; device handlers must implement idempotency.** See [Device gRPC RPC](/edge/device-rpc/overview). This is separate from legacy [shell RPC](/edge/remote-control) (`exec:<command>` over control topics).
 
 ## Permissions
 

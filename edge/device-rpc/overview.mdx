@@ -13,7 +13,7 @@ This is not the legacy [shell RPC](/edge/remote-control) path (`exec:<command>` 
 |------|------------|
 | Fleet operator / platform admin | [How it works](/edge/device-rpc/how-it-works) → [Troubleshooting](/edge/device-rpc/troubleshooting) |
 | Edge engineer shipping Omega | [Omega setup](/edge/device-rpc/omega-setup) → [How it works](/edge/device-rpc/how-it-works) |
-| Integrator / backend developer | [Invoking methods](/edge/device-rpc/invoking-methods) → [API reference](/edge/device-rpc/api-reference) |
+| Integrator / backend developer | [Invoking methods](/edge/device-rpc/invoking-methods) → [Queued invoke](/edge/device-rpc/queued-invoke) → [API reference](/edge/device-rpc/api-reference) |
 
 ## At a glance
 
@@ -51,6 +51,9 @@ flowchart LR
   <Card title="Unary invoke" icon="bolt" href="/edge/device-rpc/invoking-methods">
     Cloud callers POST to port **8082** with `{Service}/{Method}` in the URL. Streaming RPCs are not supported from cloud yet.
   </Card>
+  <Card title="Queued invoke" icon="clock" href="/edge/device-rpc/queued-invoke">
+    Enqueue calls for offline devices — poll until `succeeded`. **At-least-once** delivery; devices must dedupe.
+  </Card>
 </CardGroup>
 
 ## Components
@@ -87,7 +90,7 @@ Before invoking methods from the cloud:
 
 1. **Enable `device-grpc`** in Omega client YAML and deploy the device → [Omega setup](/edge/device-rpc/omega-setup).
 2. **Confirm schema** — `GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/services` returns services and `descriptor_digest`.
-3. **Invoke a method** — `POST` to `:8082/projects/{project_id}/devices/{device_id}/{Service}/{Method}` → [Invoking methods](/edge/device-rpc/invoking-methods).
+3. **Invoke a method** — `POST` to `:8082/projects/{project_id}/devices/{device_id}/{Service}/{Method}` → [Invoking methods](/edge/device-rpc/invoking-methods). For offline-tolerant delivery, use [Queued invoke](/edge/device-rpc/queued-invoke) instead.
 4. **Audit** — pass `?session_id=` on invoke; query invocation history via the management API.
 
 ## Next steps
@@ -95,5 +98,6 @@ Before invoking methods from the cloud:
 - [How it works](/edge/device-rpc/how-it-works) — registration and invoke pipelines in detail
 - [Omega setup](/edge/device-rpc/omega-setup) — profile YAML, local mosquitto quickstart, echo example
 - [Invoking methods](/edge/device-rpc/invoking-methods) — curl, headers, permissions
+- [Queued invoke](/edge/device-rpc/queued-invoke) — offline delivery, polling, idempotency
 - [API reference](/edge/device-rpc/api-reference) — management endpoints and response shapes
 - [Troubleshooting](/edge/device-rpc/troubleshooting) — common errors and fixes

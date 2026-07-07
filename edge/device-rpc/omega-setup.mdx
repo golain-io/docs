@@ -157,6 +157,30 @@ curl -sS -X POST \
 
 → Full caller guide: [Invoking methods](/edge/device-rpc/invoking-methods)
 
+## Idempotency for queued delivery
+
+If cloud callers use [Queued invoke](/edge/device-rpc/queued-invoke), the platform may deliver the **same RPC to your handler more than once**. This happens when:
+
+- The device returns success but the platform fails to mark the queued row `succeeded`
+- A row stays `in_flight` for **120 seconds** and is reclaimed for retry
+- Transient MQTT or bridge errors trigger runner retries (up to **5** attempts by default)
+
+The platform does **not** attach `call_id` to the gRPC request bytes sent to the device. Your service must dedupe itself.
+
+<Warning>
+  **Implement idempotency in every handler that can be reached via queued invoke.** Non-idempotent operations (actuators, payments, counters) will double-apply unless you guard them.
+</Warning>
+
+**Recommended patterns:**
+
+| Pattern | Example |
+|---------|---------|
+| Idempotency field in request proto | `string idempotency_key = 1;` — return cached response when seen before |
+| Device-side dedupe store | SQLite table keyed by hash of business id; TTL 24 h |
+| Naturally idempotent semantics | `SetDesiredState(x)` instead of `IncrementCounter()` |
+
+For unary-only testing, `Echo` is naturally safe. Production services should document which methods are queue-safe.
+
 ## Bring your own gRPC service
 
 1. Define `.proto` services and generate Go stubs.
