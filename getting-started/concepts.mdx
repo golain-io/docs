@@ -75,6 +75,10 @@ External systems (LoRaWAN NS, MDM, webhooks, gateways) connect through **integra
 
 Devices running Omega with the **SQLite replication** module can mirror local database tables to the cloud over MQTT/QUIC. The platform stages rows, runs schema review, and materializes data into project query surfaces. See [Edge data sync](/edge/data-sync/overview).
 
+## Device RPC
+
+Devices with the **`device-rpc`** Omega module expose protobuf/gRPC services tunneled over MQTT. Cloud callers invoke **unary** methods via the **RPC host** `https://rpc.ilyama.golain.io` (sync), **server-streaming** methods via the `/streams/` SSE path, or enqueue unary calls for durable delivery when devices are offline — see [Queued invoke](/edge/device-rpc/queued-invoke). **Queued delivery is at-least-once; device handlers must implement idempotency.** See [Device RPC](/edge/device-rpc/overview). This is separate from legacy [shell RPC](/edge/remote-control) (`exec:<command>` over control topics).
+
 ## Permissions
 
 Access is **graph-based (ReBAC)**: grants tie users and groups to orgs, projects, fleets, and devices. The console hides actions you cannot perform; API returns `403` when a check fails.

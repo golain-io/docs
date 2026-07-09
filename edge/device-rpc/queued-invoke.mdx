@@ -1,0 +1,211 @@
+---
+title: Queued Device RPC invoke
+description: Enqueue unary RPC calls for durable delivery when devices are offline or callers prefer async.
+---
+
+**Queued invoke** stores a unary device RPC call and delivers it when the device is reachable. Use it when the device may be offline, when you want the platform to retry transient failures, or when your integration prefers enqueue-and-poll over holding an HTTP connection open.
+
+Synchronous invoke (no `enqueue/` prefix) blocks until the device responds or the proxy times out. Queued invoke returns immediately with a `call_id` you poll until the call reaches a terminal state.
+
+<Note>
+  Queued invoke is **unary-only**. Server-streaming methods use the `/streams/` path and require the device to be online — see [Invoking methods](/edge/device-rpc/invoking-methods).
+</Note>
+
+## When to use queued vs sync invoke
+
+| | Sync invoke | Queued invoke |
+|---|-------------|---------------|
+| **URL** | `$RPC_PROXY/.../devices/{id}/{Service}/{Method}` | `$RPC_PROXY/.../devices/{id}/enqueue/{Service}/{Method}` |
+| **Device must be online** | Yes — call blocks until response or timeout | No — call is stored and delivered later |
+| **HTTP response** | Method response JSON (Connect) | `202 Accepted` with `call_id`, `state`, `expires_at` |
+| **Retries** | Caller retries on failure | Platform retries up to **5** attempts (default) |
+| **Result retrieval** | In the invoke response body | Poll `GET .../rpc/queued/{call_id}` on management API |
+| **Delivery guarantee** | Best-effort single attempt | **At-least-once** — device may see duplicates |
+
+For online devices and low-latency control paths, prefer [sync invoke](/edge/device-rpc/invoking-methods). Use queued invoke for offline-tolerant workflows, batch jobs, and integrations that already poll for completion.
+
+## At-least-once delivery
+
+<Warning>
+  **Queued RPC is at-least-once delivery.** The platform may invoke the same logical call on the device more than once — for example when the device succeeds but the platform fails to mark the row `succeeded`, or when a stale `in_flight` row is reclaimed after **120 seconds** and retried.
+
+  **Your device handlers must implement idempotency.** The platform does not forward `call_id` to the device. Design protobuf request messages with an explicit idempotency key, or make handlers safe to run multiple times with the same payload.
+</Warning>
+
+Send **`Idempotency-Key`** on enqueue so HTTP retries return the same `call_id` instead of creating duplicate rows. Use a fresh key for every distinct operation; reuse a key only when retrying an identical enqueue.
+
+## Enqueue a call
+
+```
+POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/enqueue/{Service}/{Method}
+```
+
+**Optional query:** `?ttl_seconds={n}` — how long the platform keeps trying before marking the call `expired`.
+
+### Required headers
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer {oidc_access_token}` |
+| `ORG-ID` | Organization UUID |
+| `Content-Type` | `application/json` |
+| `Connect-Protocol-Version` | `1` |
+| `Idempotency-Key` | **Recommended** — unique per logical enqueue |
+
+### Example
+
+```bash
+export RPC_PROXY=https://rpc.ilyama.golain.io
+export TOKEN=<your-oidc-access-token>
+export ORG_ID=<your-org-uuid>
+export PROJECT_ID=<your-project-uuid>
+export DEVICE_ID=<your-device-uuid>
+export IDEM_KEY=$(uuidgen)
+
+curl -sS -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/enqueue/golain.device.v1.EchoService/Echo?ttl_seconds=900" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Connect-Protocol-Version: 1" \
+  -H "Idempotency-Key: $IDEM_KEY" \
+  -d '{"message":"hello when online"}'
+```
+
+**Response** (`202 Accepted`):
+
+```json
+{
+  "ok": true,
+  "call_id": "550e8400-e29b-41d4-a716-446655440000",
+  "state": "pending",
+  "expires_at": "2026-07-07T10:30:00.000000000Z"
+}
+```
+
+Save `call_id` for polling. The request body uses the same protobuf schema rules as [sync invoke](/edge/device-rpc/invoking-methods).
+
+### ttl_seconds
+
+| `ttl_seconds` | Behavior |
+|---------------|----------|
+| Omitted or `0` | Defaults to **900** seconds (15 minutes) |
+| Below 60 | Clamped to **60** seconds |
+| Above 86400 | Clamped to **86400** seconds (24 hours) |
+
+## Poll call status
+
+```
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}
+```
+
+Uses the management API on `api.ilyama.golain.io`, not the RPC host. Requires `can_invoke_rpc` on the device.
+
+```bash
+export API=https://api.ilyama.golain.io
+export CALL_ID=<call-id-from-enqueue-response>
+
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued/$CALL_ID"
+```
+
+Example poll response:
+
+```json
+{
+  "ok": 1,
+  "data": {
+    "call_id": "550e8400-e29b-41d4-a716-446655440000",
+    "state": "succeeded",
+    "service_name": "golain.device.v1.EchoService",
+    "method_name": "Echo",
+    "attempts": 1,
+    "grpc_status_code": 0,
+    "response": "<base64-encoded-protobuf-bytes>"
+  }
+}
+```
+
+### Call states
+
+| State | Meaning |
+|-------|---------|
+| `pending` | Waiting for first delivery attempt |
+| `in_flight` | Platform is invoking the device now |
+| `failed` | Attempt failed; will retry if TTL and attempts remain |
+| `succeeded` | Device returned a response; `response` field populated |
+| `expired` | TTL elapsed before successful delivery |
+| `dlq` | Exhausted retries or hit a non-retryable error |
+
+<Note>
+  On `succeeded`, the `response` field is **base64-encoded protobuf response bytes**. Decode with your protobuf response type (or a Connect client) after base64 decode — it is not Connect JSON.
+</Note>
+
+### Platform behavior
+
+| Setting | Value |
+|---------|-------|
+| Default TTL | **900** s (clamp **60**–**86400**) |
+| Max delivery attempts | **5** |
+| Stale `in_flight` reclaim | **120** s — main source of duplicate device invocations |
+| Per-attempt invoke timeout | **60** s |
+
+## Device-side idempotency
+
+The platform does not attach `call_id` to the gRPC payload sent to the device.
+
+| Approach | Notes |
+|----------|-------|
+| **Idempotency key in request proto** | Recommended — caller puts a stable UUID in the request message; handler returns cached result for duplicates |
+| **Naturally idempotent operations** | Reads, idempotent writes (e.g. set state to desired value) |
+| **Dedupe store on device** | SQLite table keyed by business id; short TTL window |
+
+<Warning>
+  Non-idempotent handlers (motor start, payment capture, counter increment) **will** misbehave under queued delivery unless you add explicit deduplication.
+</Warning>
+
+→ Edge engineers: see [Omega setup — idempotency](/edge/device-rpc/omega-setup#idempotency-for-queued-invoke)
+
+## Local development
+
+```bash
+export API=https://localhost:19090
+export RPC_PROXY=http://localhost:8082
+
+# Enqueue
+curl -sS -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/enqueue/golain.device.v1.EchoService/Echo" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Connect-Protocol-Version: 1" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"message":"queued ping"}'
+
+# Poll (use call_id from enqueue response)
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued/$CALL_ID"
+```
+
+## Common errors
+
+| HTTP status | Message | Meaning |
+|-------------|---------|---------|
+| 401 | `unauthorized` | Missing or invalid bearer token |
+| 403 | `forbidden` | Missing `can_invoke_rpc` |
+| 404 | `not found` | Bad enqueue URL or unknown `call_id` on poll |
+| 409 | `request already in progress` | Duplicate `Idempotency-Key` while first enqueue still running |
+| 400 | `invalid ttl_seconds` | Malformed TTL query parameter |
+
+Successful enqueue returns **202** with `call_id` (see above).
+
+## Related
+
+- [Invoking methods](/edge/device-rpc/invoking-methods) — synchronous invoke
+- [Omega setup](/edge/device-rpc/omega-setup) — device-side configuration and idempotency
+- [API reference](/edge/device-rpc/api-reference) — endpoint summary
+- [Troubleshooting](/edge/device-rpc/troubleshooting) — queued call stuck or duplicated

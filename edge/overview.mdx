@@ -12,7 +12,7 @@ Repository: [golain-io/omega](https://github.com/golain-io/omega)
 ```
 ┌──────────────────────────────────────────────────────────┐
 │ Client YAML (clients/my-device.yaml)                     │
-│  modules: shadow, ota, heartbeat, rpc, sqlite-repl, …   │
+│  modules: shadow, ota, heartbeat, device-rpc, sqlite-repl, …   │
 │  security: HMAC control, capability gating               │
 └──────────────────────┬───────────────────────────────────┘
                        │
@@ -90,7 +90,10 @@ Copy `clients/_template.yaml` to create your own.
     systemd, launchd, Windows service.
   </Card>
   <Card title="Remote control" icon="gamepad" href="/edge/remote-control">
-    Shadow, OTA, RPC, SSH, RTC.
+    Shadow, OTA, legacy shell RPC, SSH, RTC.
+  </Card>
+  <Card title="Device RPC" icon="code" href="/edge/device-rpc/overview">
+    Typed gRPC services on devices — cloud unary invoke and server-stream SSE over HTTP.
   </Card>
   <Card title="SQLite sync" icon="database" href="/edge/data-sync/overview">
     Edge replication — lineages, schema reviews, mirror tables (full guide).

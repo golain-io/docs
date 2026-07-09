@@ -1,0 +1,274 @@
+---
+title: Invoking Device RPC methods
+description: Call unary and server-streaming gRPC methods on devices from the cloud over HTTP.
+---
+
+Cloud callers invoke device methods through a dedicated **RPC proxy** at `https://rpc.ilyama.golain.io`. The proxy authenticates your user token, transcodes JSON to protobuf, relays the call to the device, and returns a JSON response (unary) or an SSE event stream (server-stream).
+
+For offline-tolerant or retry-friendly workflows, use [Queued invoke](/edge/device-rpc/queued-invoke) (`/enqueue/{Service}/{Method}`) instead of blocking on the device. Queued invoke is **unary-only**.
+
+<Warning>
+  Invoke, stream, and enqueue use the **RPC host** (`https://rpc.ilyama.golain.io`) — not the management API on `api.ilyama.golain.io`. Management routes (list services, reflect, audit, poll queued calls) stay on `https://api.ilyama.golain.io/core/api/v1/...`.
+</Warning>
+
+## Before you invoke
+
+1. Device is **online** with `device-rpc` running and schema **bound** — see [Omega setup](/edge/device-rpc/omega-setup).
+2. Your user has **`can_invoke_rpc`** on the target device.
+3. You know the **full protobuf service name** and **method name** — discover them via the services API below.
+
+## Discover available methods
+
+```bash
+export TOKEN=<your-oidc-access-token>
+export ORG_ID=<your-org-uuid>
+export PROJECT_ID=<your-project-uuid>
+export DEVICE_ID=<your-device-uuid>
+
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "https://api.ilyama.golain.io/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/services"
+```
+
+Example response:
+
+```json
+{
+  "ok": 1,
+  "data": {
+    "descriptor_digest": "sha256:…",
+    "services": [
+      {
+        "name": "golain.device.v1.EchoService",
+        "methods": [
+          { "name": "Echo", "method_type": "unary" },
+          { "name": "EchoServerStream", "method_type": "server_stream" },
+          { "name": "EchoClientStream", "method_type": "client_stream" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+Use the exact `name` values in the invoke URL:
+
+| `method_type` | Cloud path |
+|---------------|------------|
+| `unary` | `POST $RPC_PROXY/.../{Service}/{Method}` |
+| `server_stream` | `POST $RPC_PROXY/.../streams/{Service}/{Method}` |
+| `client_stream`, `bidi_stream` | Device only — not available from cloud |
+
+## Invoke endpoint (unary)
+
+```
+POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/{Service}/{Method}
+```
+
+| Segment | Example |
+|---------|---------|
+| `{project_id}` | Project UUID |
+| `{device_id}` | Device UUID |
+| `{Service}` | Full proto service name, e.g. `golain.device.v1.EchoService` |
+| `{Method}` | Method name, e.g. `Echo` |
+
+**Optional query parameter:** `?session_id={uuid}` — groups invocation traces for audit queries. Generate any UUID; no separate session-create API is required.
+
+## Required headers (unary)
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer {oidc_access_token}` |
+| `ORG-ID` | Organization UUID |
+| `Content-Type` | `application/json` |
+| `Connect-Protocol-Version` | `1` |
+
+Same authentication as the Console and `/core/api/v1` — see [Platform concepts — Authentication](/getting-started/concepts#authentication).
+
+## Example: Echo unary call
+
+```bash
+export RPC_PROXY=https://rpc.ilyama.golain.io
+SESSION_ID=$(uuidgen)
+
+curl -sS -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/golain.device.v1.EchoService/Echo?session_id=$SESSION_ID" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Connect-Protocol-Version: 1" \
+  -d '{"message":"hello from cloud"}'
+```
+
+Expected success body (Connect JSON):
+
+```json
+{
+  "message": "Echo: hello from cloud",
+  "sequence": 1
+}
+```
+
+Request fields match the protobuf message schema — for Echo, see `EchoRequest` in the [echo proto](https://github.com/golain-io/omega/blob/main/modules/device-rpc/proto/golain/device/v1/echo.proto).
+
+## Stream a method (SSE)
+
+Server-streaming methods use a separate URL path and return **Server-Sent Events** instead of Connect JSON.
+
+```
+POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/streams/{Service}/{Method}
+```
+
+### Required headers (stream)
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer {oidc_access_token}` |
+| `ORG-ID` | Organization UUID |
+| `Content-Type` | `application/json` |
+| `Accept` | `text/event-stream` |
+
+Use **`curl -N`** (no buffer) so events print as they arrive. Optional `?session_id=` works the same as unary invoke.
+
+### Example: EchoServerStream
+
+```bash
+curl -N -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/streams/golain.device.v1.EchoService/EchoServerStream" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{"message":"stream me"}'
+```
+
+### SSE event types
+
+| Event | Payload | Meaning |
+|-------|---------|---------|
+| `connected` | `{"stream_id":"…"}` | Stream opened |
+| `message` | Base64-encoded protobuf response message | One stream frame from the device |
+| `ping` | `{}` | Keepalive — sent every **15 s** |
+| `end` | `{}` | Stream completed normally |
+| `error` | `{"grpc_status_code":N,"grpc_message":"…"}` | Stream failed |
+| `cancelled` | `{}` | Stream cancelled |
+
+Decode each `message` event's data with your protobuf response type after base64 decode.
+
+<Note>
+  There is **no cloud enqueue path for streams**. Use sync unary invoke or server-stream only while the device is online.
+</Note>
+
+## Permissions
+
+| Action | Permission |
+|--------|------------|
+| Invoke method (RPC host) | `can_invoke_rpc` on device |
+| Stream method (`/streams/...` on RPC host) | `can_invoke_rpc` on device |
+| List services | `can_invoke_rpc` on device |
+| Poll queued call status | `can_invoke_rpc` on device |
+| Query invocation history | `can_invoke_rpc` on device |
+| Force schema reflect | `can_write_device_metadata` on device |
+
+Missing permission returns `403 forbidden`.
+
+## Audit invocation history
+
+After invoking with `?session_id=`, query traces on the management API:
+
+```bash
+export API=https://api.ilyama.golain.io
+
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?page=1&limit=50"
+```
+
+Each row includes `service_name`, `method_name`, `grpc_status_code`, `latency_ms`, and payload digests — not raw request/response bodies.
+
+## Local development
+
+When running ilyama locally:
+
+```bash
+export API=https://localhost:19090
+export RPC_PROXY=http://localhost:8082
+
+# List services
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/services"
+
+# Unary invoke
+curl -sS -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/golain.device.v1.EchoService/Echo" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Connect-Protocol-Version: 1" \
+  -d '{"message":"ping"}'
+
+# Server stream
+curl -N -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/streams/golain.device.v1.EchoService/EchoServerStream" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{"message":"stream me"}'
+```
+
+With `AUTH_BYPASS=true`, e2e tests use `Authorization: Bearer test-bypass-token` and optional `X-Test-User-ID`.
+
+## Manual schema refresh
+
+If the device firmware changed but announce did not run, force reflection:
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/reflect"
+```
+
+Requires `can_write_device_metadata`. Returns updated `descriptor_digest`, `services`, and `schema_bound` — see [API reference](/edge/device-rpc/api-reference).
+
+## Streaming errors (501)
+
+| Situation | HTTP | Message |
+|-----------|------|---------|
+| Server-stream method on **sync** path (`/{Service}/{Method}`) | 501 | `streaming rpc not supported` |
+| Unary or client/bidi method on **`/streams/`** path | 501 | `only server-streaming rpc supported` |
+| Client-stream or bidi on sync path | 501 | `streaming rpc not supported` |
+
+Use the sync path for unary methods and `/streams/` for `server_stream` methods only.
+
+## Common errors
+
+| HTTP status | Message | Meaning |
+|-------------|---------|---------|
+| 401 | `unauthorized` | Missing or invalid bearer token |
+| 403 | `forbidden` | Missing `can_invoke_rpc` |
+| 404 | `device descriptor not found` | Schema not bound — see [Troubleshooting](/edge/device-rpc/troubleshooting) |
+| 404 | `service not found in descriptor` | Wrong service name in URL |
+| 404 | `method not found in descriptor` | Wrong method name |
+| 501 | `streaming rpc not supported` | Streaming method on sync path, or client/bidi from cloud |
+| 501 | `only server-streaming rpc supported` | Non-server-stream method on `/streams/` path |
+
+→ [Troubleshooting](/edge/device-rpc/troubleshooting)
+
+<Note>
+  **Connect JSON** (`Content-Type: application/json`, `Connect-Protocol-Version: 1`) is the simplest path for unary curl and scripts. The same unary URL also accepts **Connect binary** and **gRPC** via content negotiation if you use generated clients.
+</Note>
+
+## Related
+
+- [Queued invoke](/edge/device-rpc/queued-invoke) — async unary delivery when device may be offline
+- [API reference](/edge/device-rpc/api-reference) — all management endpoints
+- [Omega setup](/edge/device-rpc/omega-setup) — device-side configuration
+- [How it works](/edge/device-rpc/how-it-works) — invoke overview

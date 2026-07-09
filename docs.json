@@ -107,6 +107,18 @@
             ]
           },
           {
+            "group": "Device RPC",
+            "pages": [
+              "edge/device-rpc/overview",
+              "edge/device-rpc/how-it-works",
+              "edge/device-rpc/omega-setup",
+              "edge/device-rpc/invoking-methods",
+              "edge/device-rpc/queued-invoke",
+              "edge/device-rpc/api-reference",
+              "edge/device-rpc/troubleshooting"
+            ]
+          },
+          {
             "group": "Edge SQLite sync",
             "pages": [
               "edge/data-sync/overview",

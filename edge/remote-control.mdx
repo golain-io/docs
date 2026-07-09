@@ -37,7 +37,11 @@ Reports CPU, memory, uptime on `{root}/heartbeat/report/status`. Drives **online
 
 Use shadow for desired vs reported configuration sync.
 
-## RPC
+## Legacy shell RPC
+
+<Note>
+  This section covers **legacy shell RPC** (allowlisted commands over signed control topics). For typed protobuf/gRPC services on devices, see [Device RPC](/edge/device-rpc/overview).
+</Note>
 
 **Execute:** `{root}/reflection/control/request` with `value: "exec:<command>"`
 

@@ -1,0 +1,394 @@
+---
+title: Device RPC API reference
+description: Management HTTP routes, invoke proxy, server-stream SSE, permissions, and response shapes.
+---
+
+Device RPC uses the **RPC host** for invoke, stream, and enqueue, plus the management API on `api.ilyama.golain.io`. Set these before running the examples:
+
+```bash
+export API=https://api.ilyama.golain.io/core/api/v1
+export RPC_PROXY=https://rpc.ilyama.golain.io
+export TOKEN=…          # OIDC access token (same as Console)
+export ORG_ID=…         # Organization UUID
+export PROJECT_ID=…
+export DEVICE_ID=…
+```
+
+| Surface | Base URL | Purpose |
+|---------|----------|---------|
+| **Management API** | `https://api.ilyama.golain.io/core/api/v1/projects/{project_id}/…` | List services, reflect schema, fetch descriptors, audit history, poll queued calls |
+| **Sync invoke / enqueue** | `https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/…` | Unary sync invoke and async enqueue (no `/core/api/v1` prefix) |
+| **Server stream** | `https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/streams/…` | Server-streaming methods over SSE (no `/core/api/v1` prefix) |
+
+<Warning>
+  Invoke, stream, and enqueue use the **RPC host** (`https://rpc.ilyama.golain.io`). Management routes stay on `https://api.ilyama.golain.io/core/api/v1/...`.
+</Warning>
+
+Management responses use the envelope `"ok": 1` with a `data` object. Invoke success returns Connect JSON for the protobuf response message. Invoke errors return `{ "ok": false, "message": "…" }`.
+
+## Authentication
+
+Every route requires:
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer {oidc_access_token}` |
+| `ORG-ID` | Active organization UUID |
+
+Invoke and enqueue also require `Content-Type: application/json` and `Connect-Protocol-Version: 1`.
+
+## Permissions
+
+| Operation | Permission |
+|-----------|------------|
+| `GET …/rpc/services` | `can_invoke_rpc` on device |
+| `GET …/rpc/sessions/{session_id}/invocations` | `can_invoke_rpc` on device |
+| `GET …/rpc/queued/{call_id}` | `can_invoke_rpc` on device |
+| `POST …/rpc/reflect` | `can_write_device_metadata` on device |
+| `GET …/rpc/descriptors/{digest}` | Project-scoped read (standard project auth) |
+| `POST $RPC_PROXY/…/{Service}/{Method}` | `can_invoke_rpc` on device |
+| `POST $RPC_PROXY/…/streams/{Service}/{Method}` | `can_invoke_rpc` on device |
+| `POST $RPC_PROXY/…/enqueue/{Service}/{Method}` | `can_invoke_rpc` on device |
+
+## Rate limits
+
+| Surface | Approx. limit |
+|---------|---------------|
+| Management routes | 12–64 req/s (varies by endpoint) |
+| Sync invoke (RPC host) | 32 req/s |
+| Enqueue (RPC host) | 12 req/s |
+
+Back off on `429`, `502`, and `503`.
+
+---
+
+## List device services
+
+```
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/services
+```
+
+**Permission:** `can_invoke_rpc`
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/services"
+```
+
+**Response `data` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `descriptor_digest` | string | Content hash, e.g. `sha256:…` (absent when unbound) |
+| `services` | array | `{ name, methods[] }` — each method has `name`, `method_type` |
+
+`services` is empty when no schema is bound yet.
+
+Example:
+
+```json
+{
+  "ok": 1,
+  "data": {
+    "descriptor_digest": "sha256:…",
+    "services": [
+      {
+        "name": "golain.device.v1.EchoService",
+        "methods": [
+          { "name": "Echo", "method_type": "unary" },
+          { "name": "EchoClientStream", "method_type": "client_stream" }
+        ]
+      }
+    ]
+  }
+}
+```
+
+---
+
+## Reflect device schema
+
+```
+POST /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/reflect
+```
+
+**Permission:** `can_write_device_metadata`
+
+Forces the platform to reflect gRPC services from the device (when online), register the descriptor if new, and bind the device. Skips the device round-trip when the digest is already cached for the project.
+
+**Request body:** `{}`
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/reflect"
+```
+
+**Response `data` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `descriptor_id` | string | UUID of registry row |
+| `descriptor_digest` | string | Content-addressed digest |
+| `descriptor_new` | boolean | `true` if a new descriptor was registered |
+| `schema_bound` | boolean | `true` if device binding was updated |
+| `methods_synced` | number | Method metadata rows upserted |
+| `services` | array | Parsed service definitions |
+| `proto_files` | array | `{ name, package }` proto file metadata |
+
+---
+
+## Get project descriptor
+
+```
+GET /core/api/v1/projects/{project_id}/rpc/descriptors/{digest}
+```
+
+**Permission:** Standard project read auth
+
+Fetches raw descriptor bytes for codegen or inspection. The digest must exist in the project registry.
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/rpc/descriptors/sha256%3A…"
+```
+
+URL-encode the digest in the path (for example `sha256:` → `sha256%3A`).
+
+**Response `data` fields:**
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `digest` | string | Same as path parameter |
+| `name` | string | Registry descriptor name |
+| `descriptor_bytes` | string | Base64-encoded serialized `FileDescriptorSet` |
+
+You do not need this endpoint for basic invoke — the proxy loads descriptors automatically.
+
+---
+
+## List invocation audit trail
+
+```
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations?page=&limit=
+```
+
+**Permission:** `can_invoke_rpc`
+
+Query parameters: `page` (default **1**), `limit` (default **50**).
+
+Pass the same `session_id` you used as `?session_id=` on invoke calls.
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?page=1&limit=50"
+```
+
+**Response:** `ok: 1`, `data.items[]`, and pagination `meta` (`page`, `limit`, `total`).
+
+**Each item:**
+
+| Field | Description |
+|-------|-------------|
+| `time` | Invocation timestamp |
+| `service_name` | Full protobuf service name |
+| `method_name` | Method name |
+| `grpc_status_code` | gRPC status code |
+| `latency_ms` | Round-trip latency |
+| `trace_id` | Trace identifier |
+| `req_digest` | Hash of request payload |
+| `resp_digest` | Hash of response payload |
+
+Raw request and response bodies are never stored.
+
+---
+
+## Get queued call status
+
+```
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}
+```
+
+**Permission:** `can_invoke_rpc`
+
+Poll after enqueue. Uses the management API on `api.ilyama.golain.io`, not the RPC host.
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued/$CALL_ID"
+```
+
+**Response `data` fields:**
+
+| Field | Description |
+|-------|-------------|
+| `call_id` | UUID |
+| `state` | `pending`, `in_flight`, `failed`, `succeeded`, `expired`, or `dlq` |
+| `service_name`, `method_name` | Target method |
+| `attempts` | Delivery attempts |
+| `created_at`, `updated_at` | Row timestamps |
+| `expires_at` | TTL deadline |
+| `next_attempt_at` | Scheduled retry (when `failed`) |
+| `grpc_status_code`, `grpc_message` | Device gRPC result (when available) |
+| `response` | Base64 protobuf response (when `succeeded`) |
+| `last_error` | Platform delivery error text |
+
+→ Step-by-step guide: [Queued invoke](/edge/device-rpc/queued-invoke)
+
+---
+
+## Sync invoke
+
+```
+POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/{Service}/{Method}
+```
+
+**Permission:** `can_invoke_rpc`
+
+**Query:** optional `session_id` (UUID) for audit grouping.
+
+**Headers:** `Authorization`, `ORG-ID`, `Content-Type: application/json`, `Connect-Protocol-Version: 1`
+
+**Body:** JSON object matching the protobuf **request** message.
+
+```bash
+curl -sS -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/golain.device.v1.EchoService/Echo?session_id=$(uuidgen)" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Connect-Protocol-Version: 1" \
+  -d '{"message":"hello from cloud"}'
+```
+
+**Success:** JSON matching the protobuf **response** message (Connect JSON). Echo example:
+
+```json
+{
+  "message": "Echo: hello from cloud",
+  "sequence": 1
+}
+```
+
+**Errors:** `{ "ok": false, "message": "…" }` with HTTP 4xx/5xx.
+
+→ Caller guide: [Invoking methods](/edge/device-rpc/invoking-methods)
+
+---
+
+## Server stream (SSE)
+
+```
+POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/streams/{Service}/{Method}
+```
+
+**Permission:** `can_invoke_rpc`
+
+**Query:** optional `session_id` (UUID) for audit grouping.
+
+**Headers:** `Authorization`, `ORG-ID`, `Content-Type: application/json`, `Accept: text/event-stream`
+
+**Body:** JSON object matching the protobuf **request** message (same as unary).
+
+```bash
+curl -N -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/streams/golain.device.v1.EchoService/EchoServerStream" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{"message":"stream me"}'
+```
+
+**Success:** `text/event-stream` with SSE events:
+
+| Event | Payload |
+|-------|---------|
+| `connected` | `{"stream_id":"…"}` |
+| `message` | Base64 protobuf response message |
+| `ping` | `{}` every **15 s** |
+| `end` | `{}` |
+| `error` | `{"grpc_status_code":N,"grpc_message":"…"}` |
+| `cancelled` | `{}` |
+
+**Errors:** JSON `{ "ok": false, "message": "…" }` with HTTP 4xx/5xx before the stream opens, or an `error` SSE event mid-stream.
+
+Only methods with `method_type: "server_stream"` belong on this path. Unary methods on `/streams/` return **501** `only server-streaming rpc supported`. Server-stream methods on the sync path return **501** `streaming rpc not supported`.
+
+→ Caller guide: [Invoking methods — Stream a method (SSE)](/edge/device-rpc/invoking-methods#stream-a-method-sse)
+
+---
+
+## Enqueue (async invoke)
+
+```
+POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/enqueue/{Service}/{Method}?ttl_seconds=
+```
+
+**Permission:** `can_invoke_rpc`
+
+**Query:** optional `ttl_seconds` — default **900**, clamped **60**–**86400**.
+
+**Headers:** same as sync invoke; add **`Idempotency-Key`** when retrying the same enqueue.
+
+```bash
+curl -sS -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/enqueue/golain.device.v1.EchoService/Echo?ttl_seconds=900" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Connect-Protocol-Version: 1" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"message":"hello when online"}'
+```
+
+**Response** (`202 Accepted`) — flat envelope, not nested under `data`:
+
+```json
+{
+  "ok": true,
+  "call_id": "550e8400-e29b-41d4-a716-446655440000",
+  "state": "pending",
+  "expires_at": "2026-07-07T10:30:00.000000000Z"
+}
+```
+
+Poll completion with `GET …/rpc/queued/{call_id}` on the management API.
+
+<Note>
+  Queued delivery is **at-least-once**. Device handlers must be idempotent — see [Queued invoke](/edge/device-rpc/queued-invoke).
+</Note>
+
+→ Full guide: [Queued invoke](/edge/device-rpc/queued-invoke)
+
+---
+
+## OpenAPI playground
+
+These management routes appear in the **API Reference** tab under **Device RPC**:
+
+- `GET /projects/{project_id}/devices/{device_id}/rpc/services`
+- `POST /projects/{project_id}/devices/{device_id}/rpc/reflect`
+- `GET /projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations`
+- `GET /projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}`
+- `GET /projects/{project_id}/rpc/descriptors/{digest}`
+
+Open the playground from [API introduction](/api-reference/introduction). **Sync invoke, server-stream SSE, and enqueue** proxies are documented here — they are **not** in the OpenAPI spec. Use curl or a Connect client against the RPC host (`https://rpc.ilyama.golain.io`).
+
+## Related
+
+- [Invoking methods](/edge/device-rpc/invoking-methods) — sync invoke walkthrough and error codes
+- [Queued invoke](/edge/device-rpc/queued-invoke) — enqueue, poll, idempotency
+- [Troubleshooting](/edge/device-rpc/troubleshooting) — when calls fail
+- [Omega setup](/edge/device-rpc/omega-setup) — device-side configuration
