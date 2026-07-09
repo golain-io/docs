@@ -1,103 +1,86 @@
 ---
-title: Device gRPC RPC overview
-description: Call typed gRPC methods on edge devices from the cloud over HTTP.
+title: Device RPC overview
+description: Call typed gRPC methods on your edge devices from the cloud using a simple HTTP JSON API.
 ---
 
-**Device gRPC RPC** lets you invoke protobuf/gRPC services running on an edge device from the Golain cloud — using a normal HTTP API with JSON bodies. The device exposes real gRPC handlers; the platform tunnels calls over MQTT via **mqtt-bridge**, registers the service schema automatically, and transcodes Connect JSON on the way in and out.
+**Device RPC** lets you call typed methods on services running on your edge device — from the Golain cloud, using normal HTTP requests with JSON bodies. You write real gRPC handlers on the device; Golain handles authentication, routing, and JSON conversion so your app does not need gRPC or MQTT libraries.
 
-This is not the legacy [shell RPC](/edge/remote-control) path (`exec:<command>` over signed control topics). Device gRPC RPC is for typed, schema-aware method calls with audit trails and descriptor governance.
+This is different from legacy [shell RPC](/edge/remote-control), which runs allowlisted shell commands over signed control topics (`exec:<command>`). Device RPC is for protobuf services with a discoverable schema, audit trails, and typed request/response shapes.
 
 ## Who this is for
 
 | Role | Start here |
 |------|------------|
-| Fleet operator / platform admin | [How it works](/edge/device-rpc/how-it-works) → [Troubleshooting](/edge/device-rpc/troubleshooting) |
-| Edge engineer shipping Omega | [Omega setup](/edge/device-rpc/omega-setup) → [How it works](/edge/device-rpc/how-it-works) |
+| Edge engineer shipping Omega | [Omega setup](/edge/device-rpc/omega-setup) → [How it works](/edge/device-rpc/how-it-works) → [Invoking methods](/edge/device-rpc/invoking-methods) |
 | Integrator / backend developer | [Invoking methods](/edge/device-rpc/invoking-methods) → [Queued invoke](/edge/device-rpc/queued-invoke) → [API reference](/edge/device-rpc/api-reference) |
+| Fleet operator / platform admin | [How it works](/edge/device-rpc/how-it-works) → [Troubleshooting](/edge/device-rpc/troubleshooting) |
 
 ## At a glance
 
 ```mermaid
 flowchart LR
-  subgraph device [Edge device]
-    GRPC[gRPC services]
-    DG[Omega device-grpc]
-    GRPC --> DG
+  subgraph device [Your device]
+    App[Your gRPC services]
+    Omega[Omega device-rpc]
+    App --> Omega
   end
   subgraph cloud [Golain cloud]
-    B[MQTT broker]
-    W[RPC domain worker]
-    P[apis rpcproxy :8082]
-    DG -->|register/bridge announce| B
-    B --> W
-    Client[HTTP client] --> P
-    P -->|AMQP invoke| B
-    B -->|mqtt-bridge dial| DG
+    Golain[Golain]
   end
+  subgraph caller [Your app]
+    HTTP[HTTP client]
+  end
+  Omega <-->|connect and call| Golain
+  HTTP -->|JSON POST or SSE| Golain
+  Golain -->|JSON or stream events| HTTP
 ```
 
 ## Core concepts
 
 <CardGroup cols={2}>
-  <Card title="Schema announce" icon="bullhorn" href="/edge/device-rpc/how-it-works#registration-cold-path">
-    Device publishes `rpc_schema_announce` when its gRPC bridge is up. The platform learns the bridge ID and descriptor digest.
-  </Card>
-  <Card title="Reflection" icon="mirror" href="/edge/device-rpc/how-it-works#registration-cold-path">
-    On first sight of a new digest, the platform reflects gRPC services from the device and stores the descriptor in the project registry.
-  </Card>
-  <Card title="Schema binding" icon="link" href="/edge/device-rpc/how-it-works#registration-cold-path">
-    Each device is bound to one descriptor digest. Invoke uses the bound schema for transcoding.
+  <Card title="Schema" icon="file-code" href="/edge/device-rpc/how-it-works">
+    When your device connects, Golain learns which gRPC services and methods it exposes. You can list them from the management API — no manual proto upload.
   </Card>
   <Card title="Unary invoke" icon="bolt" href="/edge/device-rpc/invoking-methods">
-    Cloud callers POST to port **8082** with `{Service}/{Method}` in the URL. Streaming RPCs are not supported from cloud yet.
+    Call a method synchronously: POST JSON to the **RPC host** (`https://rpc.ilyama.golain.io`) with `{Service}/{Method}` in the URL. Golain delivers the call to the device and returns Connect JSON.
+  </Card>
+  <Card title="Server stream" icon="wave-square" href="/edge/device-rpc/invoking-methods#stream-a-method-sse">
+    Stream server-streaming methods over SSE: POST to `https://rpc.ilyama.golain.io/.../streams/{Service}/{Method}` with `Accept: text/event-stream`. Each event carries a base64 protobuf message.
   </Card>
   <Card title="Queued invoke" icon="clock" href="/edge/device-rpc/queued-invoke">
-    Enqueue calls for offline devices — poll until `succeeded`. **At-least-once** delivery; devices must dedupe.
+    Enqueue a unary call when the device may be offline. Poll until the call succeeds. Delivery is at-least-once — design handlers to be safe on retry.
   </Card>
 </CardGroup>
 
-## Components
-
-| Piece | Repository | Role |
-|-------|------------|------|
-| **Omega** `device-grpc` module | [golain-io/omega](https://github.com/golain-io/omega) | Runs gRPC server over mqtt-bridge; publishes schema announce on connect |
-| **mqtt-bridge** | [golain-io/mqtt-bridge](https://github.com/golain-io/mqtt-bridge) | Tunnels gRPC frames over MQTT handshake/session topics |
-| **MQTT broker** | [golain-io/ilyama](https://github.com/golain-io/ilyama) | Ingests announce; pools bridge connections for invoke |
-| **RPC domain worker** | ilyama | Reflects schema, registers descriptors, binds devices |
-| **apis rpcproxy** (`:8082`) | ilyama | HTTP Connect transcoding + auth; relays unary calls to device |
-
-Reference profile: [`omega/profiles/rpc-example.yaml`](https://github.com/golain-io/omega/blob/main/profiles/rpc-example.yaml).
-
 ## Prerequisites
 
-Before invoking methods from the cloud:
+Before you invoke methods from the cloud, confirm:
 
-1. **Device registered** in console or CLI — note device UUID and MQTT root topic.
-2. **Device online** on MQTT with the `device-grpc` module enabled.
-3. **Schema announce processed** — device publishes on `{rootTopic}/register/bridge`; platform binds a descriptor (see [Omega setup](/edge/device-rpc/omega-setup)).
+1. **Device registered** in the Console or via platform-tui — you need the device UUID.
+2. **Omega with `device-rpc`** enabled and deployed on the device — see [Omega setup](/edge/device-rpc/omega-setup).
+3. **Device online** on MQTT so Golain can learn its service schema.
 4. **Caller permission** — your user needs `can_invoke_rpc` on the target device.
-5. **Topology current** — after upgrading to Device RPC, run `make rabbitmq-topology` on the platform so `device_bridge_*` queues exist.
 
 <Warning>
-  Invoke requests go to port **8082** on the API host, not the main Fiber API port. Management routes (list services, reflect, audit) use `/core/api/v1/...` on the standard API port.
+  Invoke, stream, and enqueue requests go to the **RPC host** (`https://rpc.ilyama.golain.io`) — paths like `/projects/.../devices/...` with no `/core/api/v1` prefix. Management routes (list services, reflect, audit) use `https://api.ilyama.golain.io/core/api/v1/...`.
 </Warning>
 
 <Note>
-  Device gRPC RPC is separate from [legacy shell RPC](/edge/remote-control) (`reflection/control/request` + allowlisted shell commands). Use Device gRPC RPC when you need typed protobuf services; use shell RPC for simple command execution.
+  Device RPC is separate from [legacy shell RPC](/edge/remote-control). Use Device RPC when you need typed protobuf services; use shell RPC for simple command execution.
 </Note>
 
 ## Typical first-time flow
 
-1. **Enable `device-grpc`** in Omega client YAML and deploy the device → [Omega setup](/edge/device-rpc/omega-setup).
-2. **Confirm schema** — `GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/services` returns services and `descriptor_digest`.
-3. **Invoke a method** — `POST` to `:8082/projects/{project_id}/devices/{device_id}/{Service}/{Method}` → [Invoking methods](/edge/device-rpc/invoking-methods). For offline-tolerant delivery, use [Queued invoke](/edge/device-rpc/queued-invoke) instead.
-4. **Audit** — pass `?session_id=` on invoke; query invocation history via the management API.
+1. **Enable `device-rpc`** in Omega and deploy the device → [Omega setup](/edge/device-rpc/omega-setup).
+2. **Confirm services** — list available methods via the management API (for example `golain.device.v1.EchoService` / `Echo`).
+3. **Invoke a method** — POST JSON to the RPC host → [Invoking methods](/edge/device-rpc/invoking-methods). For server-streaming methods, use the `/streams/` path. For offline-tolerant delivery, use [Queued invoke](/edge/device-rpc/queued-invoke).
+4. **Review audit** — optional `?session_id=` on invoke groups traces you can query later.
 
 ## Next steps
 
-- [How it works](/edge/device-rpc/how-it-works) — registration and invoke pipelines in detail
-- [Omega setup](/edge/device-rpc/omega-setup) — profile YAML, local mosquitto quickstart, echo example
-- [Invoking methods](/edge/device-rpc/invoking-methods) — curl, headers, permissions
-- [Queued invoke](/edge/device-rpc/queued-invoke) — offline delivery, polling, idempotency
-- [API reference](/edge/device-rpc/api-reference) — management endpoints and response shapes
+- [How it works](/edge/device-rpc/how-it-works) — what happens when a device connects and when you call a method
+- [Omega setup](/edge/device-rpc/omega-setup) — enable the module and run the echo example
+- [Invoking methods](/edge/device-rpc/invoking-methods) — curl, headers, unary invoke, and SSE streaming
+- [Queued invoke](/edge/device-rpc/queued-invoke) — offline delivery, polling, and idempotency
+- [API reference](/edge/device-rpc/api-reference) — management endpoints
 - [Troubleshooting](/edge/device-rpc/troubleshooting) — common errors and fixes

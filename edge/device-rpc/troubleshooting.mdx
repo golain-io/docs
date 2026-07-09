@@ -1,42 +1,57 @@
 ---
-title: Device gRPC RPC troubleshooting
-description: Diagnose schema registration, invoke failures, and bridge connectivity.
+title: Device RPC troubleshooting
+description: Diagnose schema binding, invoke failures, streaming errors, and queued delivery issues.
 ---
 
-Structured troubleshooting for Device gRPC RPC. Work top-down: device online → schema bound → permissions → invoke URL.
+Work top-down when a call fails: device online → schema bound → permissions → correct URL → invoke.
 
-## Quick diagnostic tree
+Set these for the copyable commands:
+
+```bash
+export API=https://api.ilyama.golain.io/core/api/v1
+export RPC_PROXY=https://rpc.ilyama.golain.io
+export TOKEN=…
+export ORG_ID=…
+export PROJECT_ID=…
+export DEVICE_ID=…
+```
+
+## Quick diagnostic flow
 
 ```mermaid
 flowchart TD
-  A[Invoke fails] --> B{Device online?}
+  A[Call fails] --> B{Device online in Console?}
   B -->|No| C[Fix MQTT / certs / root topic]
-  B -->|Yes| D{Services API returns digest?}
-  D -->|No| E[Check announce + reflect]
+  B -->|Yes| D{Services API shows methods?}
+  D -->|No| E[Enable device-rpc + reflect]
   D -->|Yes| F{403 forbidden?}
-  F -->|Yes| G[Grant can_invoke_rpc]
-  F -->|No| H{404 descriptor/service?}
+  F -->|Yes| G[Grant permissions]
+  F -->|No| H{404 service or descriptor?}
   H -->|Yes| I[Fix URL or re-reflect]
-  H -->|No| J{502 / bridge error?}
-  J -->|Yes| K[Root topic / bridge_id mismatch]
+  H -->|No| J{502 / timeout / can't reach?}
+  J -->|Yes| K[Root topic mismatch or device offline]
+  J -->|No| L{501 streaming?}
+  L -->|Yes| M[Match path to method type]
 ```
 
 ## Symptom index
 
 | Symptom | Likely cause | Section |
 |---------|--------------|---------|
-| Empty `services` from GET `/rpc/services` | Schema not bound | [Schema not bound](#schema-not-bound) |
-| `device descriptor not found` on invoke | No binding in Postgres | [Schema not bound](#schema-not-bound) |
-| `forbidden` (403) | Missing ReBAC permission | [Permissions](#permissions) |
-| `unauthorized` (401) | Invalid or missing token | [Authentication](#authentication) |
-| `no active rpc bridge` / 502 | Device offline or announce missing | [Bridge not registered](#bridge-not-registered) |
-| `service not found in descriptor` | Wrong service name in URL | [Wrong invoke URL](#wrong-invoke-url) |
-| `streaming rpc not supported` (501) | Called streaming method | [Streaming limit](#streaming-limit) |
-| Invoke works on device, fails from cloud | Root topic mismatch | [Root topic mismatch](#root-topic-mismatch) |
-| Stale methods after OTA | Old digest still bound | [Stale schema](#stale-schema-after-ota) |
-| Queued call stuck `pending` / `failed` | Device offline past TTL | [Queued delivery](#queued-delivery) |
+| Empty `services` from list services | Schema not bound | [Schema not bound](#schema-not-bound) |
+| `device descriptor not found` on invoke | Schema not bound | [Schema not bound](#schema-not-bound) |
+| `forbidden` (403) | Missing permission | [Permissions](#permissions) |
+| `unauthorized` (401) | Invalid or missing token | [Permissions](#permissions) |
+| 502 / timeout / can't reach device | Device offline or wrong root topic | [Device offline](#device-offline--cant-reach-device) |
+| `service not found in descriptor` | Wrong service name in URL | [Wrong URL](#wrong-url) |
+| `method not found in descriptor` | Wrong method name in URL | [Wrong URL](#wrong-url) |
+| `streaming rpc not supported` (501) | Server-stream or client/bidi on sync path | [Streaming on wrong path](#streaming-on-wrong-path) |
+| `only server-streaming rpc supported` (501) | Unary or client/bidi on `/streams/` path | [Streaming on wrong path](#streaming-on-wrong-path) |
+| Invoke works locally, fails from cloud | Root topic mismatch | [Root topic mismatch](#root-topic-mismatch) |
+| Outdated method list after OTA | Stale schema binding | [Stale schema after OTA](#stale-schema-after-ota) |
+| Queued call stuck or expired | Device offline past TTL | [Queued stuck or duplicates](#queued-stuck-or-duplicates) |
 | Duplicate side effects from queued RPC | Handler not idempotent | [Queued idempotency](#queued-idempotency) |
-| Announce published, nothing happens | Worker / topology issue | [Platform topology](#platform-topology) |
+| Schema never appears after device connects | Self-hosted stack misconfiguration | [Self-hosted operators](#self-hosted-operators) |
 
 ---
 
@@ -44,196 +59,58 @@ flowchart TD
 
 **Symptoms:**
 
-- `GET .../rpc/services` returns `"services": []` with no `descriptor_digest`
+- `GET …/rpc/services` returns `"services": []` with no `descriptor_digest`
 - Invoke returns `404` with `"device descriptor not found"`
 
 **Check:**
 
-1. **Device running `device-grpc`** — module in `modules.required` and `security.capabilities`.
-2. **MQTT connected** — heartbeat/status shows online in console.
-3. **Announce published** — subscribe to `{rootTopic}/register/bridge` or check device logs for schema announce on connect/reconnect.
-4. **Payload valid** — must include `action: rpc_schema_announce`, `bridge_id`, `descriptor_digest`, `bridge_type: grpc`.
+1. **`device-rpc` module enabled** — in `modules.required` and `security.capabilities`. See [Omega setup](/edge/device-rpc/omega-setup).
+2. **Device online** — Console shows the device connected over MQTT.
+3. **Device restarted after enabling RPC** — the module publishes a schema announce on start and reconnect.
 
 **Fix:**
 
 ```bash
-# Force reflection (device must be online)
+# List services (should show descriptor_digest + services when bound)
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/services"
+
+# Force reflection (device must be online; requires can_write_device_metadata)
 curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
   -d '{}' \
-  "https://api.ilyama.golain.io/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/reflect"
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/reflect"
 ```
 
-Requires `can_write_device_metadata`. Re-check `/rpc/services` for non-empty `services`.
+Re-run list services. You should see a non-empty `services` array before invoking.
 
 ---
 
-## Bridge not registered
+## Device offline / can't reach device
 
 **Symptoms:**
 
-- Schema bound but invoke returns `502`, `503`, or broker errors mentioning **no active rpc bridge**
-- Reflect succeeds but invoke times out
+- Schema is bound but invoke returns **502**, **503**, or times out
+- Reflect succeeds but invoke never completes
+- Error text mentions the device cannot be reached
 
 **Check:**
 
-1. Device still **online** on MQTT (bridge registration updates `last_seen_at` on announce).
-2. **`bridge_id` in announce** matches what the device listener uses.
-3. mqtt-bridge listener started — Omega logs `gRPC echo server listening over mqtt-bridge` (or your custom service equivalent).
-4. Non-MQTT transport (`memory`) skips the listener — invoke will not work; only announce runs.
+1. **Device online** in Console — MQTT heartbeat recent.
+2. **`device-rpc` running** — Omega logs show the gRPC listener started (not `memory` transport only).
+3. **MQTT credentials and TLS** — cert not expired; broker reachable from the device network.
 
 **Fix:**
 
-- Restart device with MQTT transport and `device-grpc` module.
-- Republish announce (reconnect MQTT or restart Omega).
-- Verify broker ingests `{rootTopic}/register/bridge` (no ACL denial).
-
----
-
-## Root topic mismatch
-
-**Symptoms:**
-
-- Device connected; announce processed; reflect succeeds; invoke fails with dial/bridge errors
-- Works with standalone `device-grpc-run` locally but not when registered in Golain
-
-**Cause:**
-
-The cloud dials mqtt-bridge using platform DB fields: `topic_slug` + `device_name` (see [How it works](/edge/device-rpc/how-it-works#root-topic-resolution)). Omega `connection.root_topic` must match.
-
-**Check:**
-
-| Platform | Omega must use |
-|----------|----------------|
-| `topic_slug=acme`, device name `sensor-01` | `root_topic: acme/sensor-01` or `/acme/sensor-01` |
-| No topic slug, device name `sensor-01` | `root_topic: sensor-01` |
-
-Use `golain omega scaffold` or console device MQTT details to confirm the expected root topic.
-
-**Fix:**
-
-Update Omega client YAML / env (`OMEGA_ROOT_TOPIC`) to match platform assignment. Redeploy and verify announce on the corrected topic tree.
-
----
-
-## Wrong invoke URL
-
-**Symptoms:**
-
-- `404 service not found in descriptor`
-- `404 method not found in descriptor`
-
-**Fix:**
-
-1. Call `GET .../rpc/services` and copy the exact `services[].name` and `methods[].name`.
-2. Use the **full** service name (e.g. `golain.device.v1.EchoService`), not a short alias.
-3. POST to port **8082**:
-
-   ```
-   POST :8082/projects/{pid}/devices/{did}/golain.device.v1.EchoService/Echo
-   ```
-
----
-
-## Permissions
-
-**Symptoms:** HTTP `403` with `"message": "forbidden"`
-
-**Fix:**
-
-Grant **`can_invoke_rpc`** on the target device for the calling user or their permission group. Reflect additionally requires **`can_write_device_metadata`**.
-
-Verify in console device permissions or ReBAC tooling, then retry invoke.
-
----
-
-## Authentication
-
-**Symptoms:** HTTP `401` with `"message": "unauthorized"`
-
-**Check:**
-
-- `Authorization: Bearer` header present and token not expired
-- `ORG-ID` header set to a valid organization UUID
-- Token is a **user** OIDC token — not a device MQTT credential
-
----
-
-## Streaming limit
-
-**Symptoms:** HTTP `501` with `"streaming rpc not supported"`
-
-**Cause:** Cloud invoke proxy supports **unary** methods only.
-
-**Fix:** Call a unary method (e.g. `Echo`, not `EchoServerStream`). Streaming remains available device-side over mqtt-bridge for custom tooling.
-
----
-
-## Stale schema after OTA
-
-**Symptoms:**
-
-- New firmware deployed; invoke hits old methods or fails with schema errors
-- `/rpc/services` shows outdated method list
-
-**Check:**
-
-1. Device logs show new `descriptor_digest` in announce after OTA restart.
-2. Digest in announce differs from `GET /rpc/services` response.
-
-**Fix:**
-
-1. Restart device so announce runs with updated embedded descriptor.
-2. If announce digest is correct but platform stale, `POST .../rpc/reflect`.
-3. After proto breaking changes, verify compat policy for your rollout (descriptor registry is content-addressed — new digest = new registry entry).
-
----
-
-## Platform topology
-
-**Symptoms:**
-
-- Announce visible on MQTT but `/rpc/services` never populates
-- Reflect hangs or returns worker errors
-- Invoke never reaches mqtt-broker
-
-**Check after RPC feature upgrade:**
-
-1. **RPC domain worker running** — domain-workers logs show RPC worker registered.
-2. **RabbitMQ topology** — run `make rabbitmq-topology` in ilyama. Queues must include:
-   - `device_rpc_schema_announced_queue`
-   - `device_bridge_invoke_queue`
-   - `device_bridge_reflect_queue`
-3. **mqtt-broker version** — must include RPC bridge hook and invoke/reflect handlers.
-4. **apis rpcproxy** — apis logs `rpc proxy listening addr :8082`.
-
-**Symptoms of stale topology:**
-
-- MQTT announce succeeds; no worker consume logs
-- Invoke returns immediate AMQP/502 errors
-
----
-
-## Operator checklist
-
-Run these in order when debugging a single device:
+- Restart the device with MQTT transport and `device-rpc` enabled.
+- Reconnect MQTT (restart Omega or power-cycle) so the platform sees the device again.
+- Probe with a unary Echo call:
 
 ```bash
-# 1. Device online?
-#    Console or: platform-tui devices list
-
-# 2. Schema bound?
-curl -sS -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
-  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/services" | jq .
-
-# 3. Reflect if empty
-curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
-  -H "Content-Type: application/json" -d '{}' \
-  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/reflect" | jq .
-
-# 4. Probe invoke (unary Echo)
 curl -sS -X POST \
   "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/golain.device.v1.EchoService/Echo" \
   -H "Authorization: Bearer $TOKEN" \
@@ -243,34 +120,184 @@ curl -sS -X POST \
   -d '{"message":"diagnostic ping"}'
 ```
 
-Set `API` to your main API base and `RPC_PROXY` to `:8082` (e.g. `https://api.ilyama.golain.io:8082`).
+If list services works but invoke still fails, check [Root topic mismatch](#root-topic-mismatch).
 
 ---
 
-## Queued delivery
+## Root topic mismatch
 
 **Symptoms:**
 
-- `GET .../rpc/queued/{call_id}` stays `pending` or `failed` for a long time
-- Call eventually `expired` — device was offline past `expires_at`
-- Call `succeeded` but device performed the action twice
+- Device shows online; schema bound; invoke still fails with reachability or bridge errors
+- Works with a local standalone echo server but not when registered in Golain
+
+**Cause:**
+
+The cloud dials your device using the **topic slug** and **device name** from the Console. Omega `connection.root_topic` must match that assignment.
 
 **Check:**
 
-1. Device **online** on MQTT when runner attempts delivery (queued calls wake on reconnect).
-2. **`expires_at`** not passed — default TTL is **900 s**; extend with `?ttl_seconds=` on enqueue.
-3. **`attempts`** vs `max_attempts` (default **5**) — inspect `last_error` on poll response.
-4. Row reclaimed from **`in_flight`** — after **120 s** stale reclaim, runner retries (duplicate device invoke).
+| Console assignment | Omega `root_topic` |
+|--------------------|--------------------|
+| Topic slug `acme`, device name `sensor-01` | `acme/sensor-01` or `/acme/sensor-01` |
+| No topic slug, device name `sensor-01` | `sensor-01` |
 
-**Fix offline backlog:**
+Confirm in Console device MQTT details or with `golain omega scaffold`.
+
+**Fix:**
+
+Update Omega client YAML or `OMEGA_ROOT_TOPIC`, redeploy, and verify list services still returns methods. Then retry invoke.
+
+---
+
+## Permissions
+
+**Symptoms:**
+
+- HTTP **403** with `"message": "forbidden"`
+- HTTP **401** with `"message": "unauthorized"`
+
+**Check:**
+
+- `Authorization: Bearer` header present and token not expired
+- `ORG-ID` set to a valid organization UUID
+- Token is a **user** OIDC token — not a device MQTT credential
+
+**Fix:**
+
+Grant **`can_invoke_rpc`** on the target device for your user or permission group. Reflect additionally requires **`can_write_device_metadata`**.
+
+Update permissions in Console, then retry.
+
+---
+
+## Wrong URL
+
+**Symptoms:**
+
+- `404 service not found in descriptor`
+- `404 method not found in descriptor`
+- Invoke hits the management API host instead of the **RPC host**
+
+**Fix:**
+
+1. List services and copy exact `services[].name` and `methods[].name`:
 
 ```bash
-# Poll status
-curl -sS -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
-  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued/$CALL_ID" | jq .
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/services"
 ```
 
-Bring device online; runner wakes on MQTT connect. For long outages, enqueue with higher `ttl_seconds` (max **86400**).
+2. Use the **full** service name (for example `golain.device.v1.EchoService`), not a short alias.
+3. POST to the **RPC host** with no `/core/api/v1` prefix:
+
+```
+POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/golain.device.v1.EchoService/Echo
+```
+
+Only **unary** methods use the sync path. **Server-stream** methods use `/streams/{Service}/{Method}`. See [Invoking methods](/edge/device-rpc/invoking-methods).
+
+---
+
+## Streaming on wrong path
+
+**Symptoms:**
+
+- HTTP **501** with `"streaming rpc not supported"` — you POSTed a server-stream, client-stream, or bidi method to the **sync** path (`/{Service}/{Method}`)
+- HTTP **501** with `"only server-streaming rpc supported"` — you POSTed a unary or non-server-stream method to the **`/streams/`** path
+
+**Fix:**
+
+| Method type | Correct cloud path |
+|-------------|-------------------|
+| `unary` | `POST $RPC_PROXY/.../{Service}/{Method}` with Connect JSON headers |
+| `server_stream` | `POST $RPC_PROXY/.../streams/{Service}/{Method}` with `Accept: text/event-stream` and `curl -N` |
+| `client_stream`, `bidi_stream` | Device only — not available from cloud |
+
+Example — move `EchoServerStream` from sync to streams:
+
+```bash
+curl -N -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/streams/golain.device.v1.EchoService/EchoServerStream" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{"message":"stream me"}'
+```
+
+For client-stream and bidi methods (`EchoClientStream`, `EchoBidiStream`), use device-local tooling — the cloud does not expose these shapes.
+
+---
+
+## Stale schema after OTA
+
+**Symptoms:**
+
+- New firmware deployed; invoke hits old methods or schema errors
+- List services shows an outdated method list
+
+**Check:**
+
+1. Device restarted after OTA so it publishes a fresh schema announce.
+2. `descriptor_digest` from list services matches what the device logs after restart.
+
+**Fix:**
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{}' \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/reflect"
+```
+
+Re-check list services. After breaking proto changes, expect a new digest — plan OTA rollouts so old and new firmware can coexist during migration.
+
+---
+
+## Queued stuck or duplicates
+
+**Symptoms:**
+
+- Poll shows `pending` or `failed` for a long time
+- Call becomes `expired` — device was offline past `expires_at`
+- Call shows `succeeded` but the device ran the handler twice
+
+**Check:**
+
+1. Device **online** when the platform attempts delivery (queued calls retry on reconnect).
+2. **`expires_at`** not passed — default TTL is **900 s**; extend with `?ttl_seconds=` on enqueue (max **86400**).
+3. **`attempts`** and **`last_error`** on the poll response.
+
+**Fix — poll status:**
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued/$CALL_ID"
+```
+
+Bring the device online and wait for delivery. For long outages, enqueue again with a higher `ttl_seconds`.
+
+**Fix — enqueue with longer TTL:**
+
+```bash
+curl -sS -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/enqueue/golain.device.v1.EchoService/Echo?ttl_seconds=3600" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Connect-Protocol-Version: 1" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{"message":"retry when online"}'
+```
+
+→ Full behavior: [Queued invoke](/edge/device-rpc/queued-invoke)
 
 ---
 
@@ -278,31 +305,64 @@ Bring device online; runner wakes on MQTT connect. For long outages, enqueue wit
 
 **Symptoms:**
 
-- Motor started twice, counter incremented twice, or duplicate writes after a single enqueue
-- `succeeded` state but operator reports duplicate real-world effects
+- Motor started twice, counter incremented twice, or duplicate writes after one enqueue
+- `succeeded` in poll but duplicate real-world effects
 
 **Cause:**
 
-Queued RPC is **at-least-once**. The platform may invoke the device again after success if status persistence fails, or after stale `in_flight` reclaim.
+Queued RPC is **at-least-once**. The platform may invoke your device more than once for the same logical call.
 
 **Fix (device firmware):**
 
 1. Add an **idempotency key** field to request protos; cache results per key on the device.
-2. Make handlers **naturally idempotent** where possible.
-3. Do not rely on `call_id` — it is not forwarded to the device today.
+2. Prefer **naturally idempotent** handlers where possible.
+3. Do not rely on `call_id` — it is not sent to the device today.
 
-→ [Queued invoke](/edge/device-rpc/queued-invoke) · [Omega setup — Idempotency](/edge/device-rpc/omega-setup#idempotency-for-queued-delivery)
+→ [Omega setup — Idempotency](/edge/device-rpc/omega-setup#idempotency-for-queued-invoke)
 
 ---
 
+## Self-hosted operators
+
+If the device connects and publishes data but RPC schema never binds or invoke never reaches devices on a **self-hosted** stack, verify apis, mqtt-broker, and worker processes are running and topology is current. See [Self-hosted deployment](/self-hosted/overview).
+
+---
+
+## Operator checklist
+
+Run in order for a single device:
+
+```bash
+# 1. Device online? — Console or: golain devices list
+
+# 2. Schema bound?
+curl -sS -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/services"
+
+# 3. Reflect if empty (requires can_write_device_metadata)
+curl -sS -X POST -H "Authorization: Bearer $TOKEN" -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" -d '{}' \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/reflect"
+
+# 4. Probe unary Echo
+curl -sS -X POST \
+  "$RPC_PROXY/projects/$PROJECT_ID/devices/$DEVICE_ID/golain.device.v1.EchoService/Echo" \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Connect-Protocol-Version: 1" \
+  -d '{"message":"diagnostic ping"}'
+```
+
+Local dev: set `API=https://localhost:19090/core/api/v1` and `RPC_PROXY=http://localhost:8082`.
+
 ## Still stuck?
 
-- Device-side setup: [Omega setup](/edge/device-rpc/omega-setup)
-- Pipeline detail: [How it works](/edge/device-rpc/how-it-works)
-- HTTP caller reference: [Invoking methods](/edge/device-rpc/invoking-methods)
-- Queued delivery: [Queued invoke](/edge/device-rpc/queued-invoke)
-- Module README: [omega/modules/device-grpc](https://github.com/golain-io/omega/blob/main/modules/device-grpc/README.md)
+- [Omega setup](/edge/device-rpc/omega-setup) — enable `device-rpc` on the device
+- [Invoking methods](/edge/device-rpc/invoking-methods) — sync invoke, SSE streaming, and error codes
+- [API reference](/edge/device-rpc/api-reference) — all endpoints
+- [Queued invoke](/edge/device-rpc/queued-invoke) — async delivery
 
 <Note>
-  This guide covers **Device gRPC RPC** only. For legacy shell command RPC (`exec:…` over signed control topics), see [Remote control — Legacy shell RPC](/edge/remote-control#legacy-shell-rpc).
+  This guide covers **Device RPC** only. For legacy shell command RPC (`exec:…` over signed control topics), see [Remote control — Legacy shell RPC](/edge/remote-control#legacy-shell-rpc).
 </Note>

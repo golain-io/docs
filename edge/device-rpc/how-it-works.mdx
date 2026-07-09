@@ -1,184 +1,89 @@
 ---
-title: How Device gRPC RPC works
-description: Registration, schema reflection, and the invoke path from HTTP to device gRPC.
+title: How Device RPC works
+description: What happens when your device connects and when you call a method from the cloud.
 ---
 
-Device gRPC RPC has two pipelines: **registration** (runs when a device connects or its schema changes) and **invoke** (runs on every method call). Registration is heavier — it may reflect the full protobuf descriptor from the device. Invoke stays on a hot path using cached descriptors and pooled bridge connections.
-
-## Registration (cold path)
-
-When the device's gRPC bridge comes up, it announces itself. The platform registers the schema if needed and binds it to the device.
+Device RPC boils down to two moments: **when your device connects** (Golain learns what it can call) and **when you call a method** (Golain delivers your request and returns JSON or a stream).
 
 ```mermaid
 sequenceDiagram
-  participant Dev as Omega device-grpc
-  participant MQTT as MQTT broker
-  participant Worker as RPC domain worker
-  participant Reflect as mqtt-broker reflection
-  participant PG as Postgres
+  participant Dev as Your device
+  participant Golain as Golain cloud
+  participant App as Your app
 
-  Dev->>MQTT: Publish rpc_schema_announce on register/bridge
-  MQTT->>Worker: DeviceRPCSchemaAnnounced event
-  alt Digest not in project registry
-    Worker->>Reflect: gRPC reflection over mqtt-bridge
-    Reflect-->>Worker: FileDescriptorSet bytes
-    Worker->>PG: Upsert rpc_descriptors + metadata
+  Note over Dev,Golain: Connect path
+  Dev->>Golain: Connect with device-rpc
+  Golain->>Golain: Learn services and methods
+  Golain->>Golain: Bind schema to device
+
+  Note over App,Dev: Unary call path
+  App->>Golain: POST JSON to RPC host
+  Golain->>Golain: Check auth and permissions
+  Golain->>Dev: Deliver unary call
+  Dev-->>Golain: Response
+  Golain-->>App: JSON response
+
+  Note over App,Dev: Server-stream path
+  App->>Golain: POST to RPC host /streams/... (SSE)
+  Golain->>Dev: Deliver server-stream call
+  loop Until stream ends
+    Dev-->>Golain: Stream message
+    Golain-->>App: SSE message event
   end
-  Worker->>PG: Upsert device_rpc_bridges
-  Worker->>PG: Bind device_rpc_schemas
 ```
 
-### Step by step
+## When your device connects
 
-1. **Device announce** — On connect (and reconnect), Omega publishes JSON on `{rootTopic}/register/bridge`:
+1. Omega starts the `device-rpc` module and connects to Golain over MQTT.
+2. Golain learns which gRPC services and methods the device exposes (for example `golain.device.v1.EchoService` with methods `Echo` and `EchoServerStream`).
+3. Golain stores the schema for your project and binds it to this device.
+4. The device is **ready to call** — list services from the management API or invoke directly.
 
-   ```json
-   {
-     "action": "rpc_schema_announce",
-     "data": {
-       "bridge_id": "<bridge_id>",
-       "descriptor_digest": "sha256:<hex>",
-       "bridge_type": "grpc"
-     }
-   }
-   ```
+If the device disconnects and reconnects, Golain refreshes the binding. When the service schema changes, Golain picks up the new descriptor on the next connect.
 
-   When `signed_control.enabled: true`, the payload is wrapped in the standard Omega signed control envelope.
+## When you call a method
 
-2. **Broker ingest** — The MQTT broker hook parses the announce and emits a `DeviceRPCSchemaAnnounced` event to the RPC domain worker.
+### Unary (sync invoke)
 
-3. **Digest lookup** — If the digest already exists in the **project descriptor registry**, the platform skips re-reflecting from the device.
+1. Your app sends an HTTP POST with a JSON body to the **RPC host** (`https://rpc.ilyama.golain.io`) — `/{Service}/{Method}` in the URL, no `/core/api/v1` prefix.
+2. Golain checks your token, organization, and `can_invoke_rpc` permission on the device.
+3. Golain delivers the call to the device and waits for the handler to finish.
+4. Golain converts the response to JSON and returns it to your app.
 
-4. **Reflection** — On digest miss, the platform dials the device over mqtt-bridge and runs **gRPC server reflection** to collect the `FileDescriptorSet`. The descriptor is content-addressed (`sha256:…`) and stored in Postgres with parsed service/method metadata.
+Optional `?session_id=` on the invoke URL groups calls for later audit queries. See [Invoking methods](/edge/device-rpc/invoking-methods) for headers, URL shape, and examples.
 
-5. **Bridge registration** — `device_rpc_bridges` records the active `bridge_id` and `last_seen_at` so the mqtt-broker pool knows how to dial the device.
+### Server-stream (SSE)
 
-6. **Schema binding** — `device_rpc_schemas` links the device to its descriptor. If the digest is unchanged, rebind is skipped.
+1. Your app POSTs to the **RPC host** with `/streams/{Service}/{Method}` in the URL and `Accept: text/event-stream`.
+2. Golain checks auth and permissions the same way as unary invoke.
+3. Golain opens a server-streaming call to the device and relays each response message as an SSE `message` event (base64 protobuf).
+4. The stream ends with an `end` event, or `error` / `cancelled` on failure.
 
-### Fast paths
+Use `curl -N` so the client does not buffer events. See [Stream a method (SSE)](/edge/device-rpc/invoking-methods#stream-a-method-sse).
 
-| Condition | Platform behavior |
-|-----------|-------------------|
-| Digest already in project registry | Skip device reflection; register/bind only |
-| Device binding digest unchanged | Skip rebind |
-| Manual `POST .../rpc/reflect` with cached digest | Skip device reflection when digest matches cache |
+<Note>
+  Your device's MQTT **root topic** and **device name** must match what you registered in the Console. A mismatch causes invoke or schema errors even when MQTT looks healthy. See [Omega setup](/edge/device-rpc/omega-setup).
+</Note>
 
-## Invoke (hot path)
+## Cloud invoke by method type
 
-Every cloud invoke follows the same relay path. The platform does not re-reflect on invoke — it uses the bound descriptor bytes cached in apis.
+| Method type | Cloud path | Notes |
+|-------------|------------|-------|
+| **Unary** | `POST https://rpc.ilyama.golain.io/.../{Service}/{Method}` | Connect JSON request and response |
+| **Server stream** | `POST https://rpc.ilyama.golain.io/.../streams/{Service}/{Method}` | SSE (`text/event-stream`) |
+| **Client stream** | — | Device only — sync path returns **501** `streaming rpc not supported` |
+| **Bidi stream** | — | Device only — sync path returns **501** `streaming rpc not supported` |
 
-```mermaid
-sequenceDiagram
-  participant Client as HTTP client
-  participant Proxy as apis rpcproxy :8082
-  participant AMQP as AMQP
-  participant Broker as mqtt-broker pool
-  participant Dev as Device gRPC
+The bundled echo example includes all four shapes. From the cloud, call `Echo` (unary) or `EchoServerStream` (server-stream). `EchoClientStream` and `EchoBidiStream` are for device-local testing.
 
-  Client->>Proxy: POST /projects/.../Service/Method
-  Proxy->>Proxy: Auth + load descriptor + Vanguard transcoder
-  Proxy->>AMQP: InvokeDeviceBridge unary relay
-  AMQP->>Broker: device_bridge_invoke_queue
-  Broker->>Dev: gRPC over mqtt-bridge
-  Dev-->>Broker: Response bytes
-  Broker-->>Proxy: Response bytes
-  Proxy-->>Client: JSON (Connect transcoding)
-  Proxy->>Proxy: Write invocation trace to TSDB
-```
+## Queued calls
 
-### Step by step
-
-1. **HTTP request** — Client POSTs to:
-
-   ```
-   https://{api-host}:8082/projects/{project_id}/devices/{device_id}/{full.service.Name}/{Method}
-   ```
-
-2. **Auth middleware** — Validates `Authorization: Bearer` token, `ORG-ID` header, and `can_invoke_rpc` permission on the device (single scoped DB check).
-
-3. **Descriptor resolution** — Loads the device's bound descriptor bytes from Postgres (with a short TTL cache). Parses the target service and method; rejects streaming methods with `501`.
-
-4. **Transcoding** — **Vanguard** converts Connect JSON request bodies to protobuf bytes using the cached `ServiceDescriptor`. No hand-rolled dynamic protobuf on the hot path.
-
-5. **Relay** — apis publishes an AMQP invoke command. mqtt-broker picks it up, gets or creates a pooled gRPC client over mqtt-bridge, and calls the device method with raw byte passthrough.
-
-6. **Response** — Protobuf response bytes flow back through the same chain; Vanguard transcodes to JSON for the HTTP client.
-
-7. **Audit trace** — One row is written to the project-scoped `rpc_invocations_*` Timescale hypertable: latency, gRPC status, service/method names, and **SHA-256 digests** of request/response — never raw payloads.
-
-Optional `?session_id=` on the invoke URL groups traces for later queries via the management API.
-
-## Queued delivery
-
-When a caller uses the **enqueue** path on `:8082`, the platform persists the request in `rpc_queued_calls` and a background runner delivers it via the same `InvokeDeviceBridge` relay as sync invoke.
-
-```mermaid
-sequenceDiagram
-  participant Client as HTTP client
-  participant Proxy as apis rpcproxy :8082
-  participant Worker as RPC domain worker
-  participant PG as Postgres
-  participant Broker as mqtt-broker pool
-  participant Dev as Device gRPC
-
-  Client->>Proxy: POST .../enqueue/Service/Method
-  Proxy->>Worker: EnqueueDeviceRPCCall
-  Worker->>PG: INSERT rpc_queued_calls pending
-  Proxy-->>Client: 202 call_id state expires_at
-
-  loop Runner poll or device reconnect
-    Worker->>PG: Claim due row in_flight
-    Worker->>Broker: InvokeDeviceBridge
-    Broker->>Dev: gRPC unary
-    Dev-->>Broker: Response
-    Worker->>PG: Mark succeeded or failed
-  end
-
-  Client->>Proxy: GET rpc/queued/call_id
-  Proxy-->>Client: state grpc_status response
-```
-
-Queued RPC is **at-least-once**: stale `in_flight` rows are reclaimed after **120 s** and retried; the platform does not pass `call_id` to the device.
-
-<Warning>
-  Device handlers must be **idempotent** when called through the queued path. See [Queued invoke](/edge/device-rpc/queued-invoke).
-</Warning>
-
-## MQTT bridge wire protocol
-
-Between cloud dialer and device listener, **mqtt-bridge** frames gRPC over MQTT:
-
-| Topic pattern | Direction | Purpose |
-|---------------|-----------|---------|
-| `{rootTopic}/register/bridge` | Device → cloud | Schema announce |
-| `{rootTopic}/bridge/{bridge_id}/handshake/request/{client_id}` | Cloud → device | Session handshake |
-| `{rootTopic}/bridge/{bridge_id}/handshake/response/{client_id}` | Device → cloud | Handshake reply |
-| `{rootTopic}/bridge/{bridge_id}/session/{session_id}/up` | Device → cloud | gRPC frames upstream |
-| `{rootTopic}/bridge/{bridge_id}/session/{session_id}/down` | Cloud → device | gRPC frames downstream |
-
-QoS defaults to **2** on the `device-grpc` module for reliable delivery.
-
-## Root topic resolution
-
-The cloud must dial the same MQTT topic tree the device listens on. Dial info is resolved from platform data:
-
-- **`bridge_id`** — from the device's schema announce (stored in `device_rpc_bridges`)
-- **`device_name`** — the device's registered name
-- **`topic_slug`** — project/fleet topic prefix from device registration
-
-The effective root topic is `/{topic_slug}/{device_name}` when `topic_slug` is set, otherwise just `{device_name}`.
-
-Your Omega `connection.root_topic` (or scaffolded `OMEGA_ROOT_TOPIC`) must match what the platform expects. A mismatch produces "no active bridge" or dial failures even when MQTT is connected.
-
-## Unary-only from cloud
-
-The reference **EchoService** in Omega implements unary, client-stream, server-stream, and bidi-stream methods. The cloud invoke proxy supports **unary methods only** today. Calling a streaming method returns `501 streaming rpc not supported`.
-
-Device-side streaming over mqtt-bridge still works for local or custom tooling; only the `:8082` cloud entrypoint is limited.
+When the device may be offline, use the **enqueue** path instead of a blocking invoke. Golain stores the request and delivers it when the device is available; you poll for the result. **Queued invoke is unary-only** — there is no enqueue path for streams. Delivery is **at-least-once**, so handlers should be idempotent. See [Queued invoke](/edge/device-rpc/queued-invoke) for enqueue, poll, and retry behavior.
 
 ## Related
 
-- [Queued invoke](/edge/device-rpc/queued-invoke) — enqueue, poll, idempotency
-- [Omega setup](/edge/device-rpc/omega-setup) — enable the module and verify announce
+- [Overview](/edge/device-rpc/overview) — concepts and prerequisites
+- [Omega setup](/edge/device-rpc/omega-setup) — enable device-rpc and verify connect
 - [Invoking methods](/edge/device-rpc/invoking-methods) — HTTP caller guide
-- [Troubleshooting](/edge/device-rpc/troubleshooting) — when registration or invoke fails
+- [Queued invoke](/edge/device-rpc/queued-invoke) — offline delivery
+- [Troubleshooting](/edge/device-rpc/troubleshooting) — when connect or invoke fails
