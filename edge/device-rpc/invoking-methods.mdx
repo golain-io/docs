@@ -211,14 +211,31 @@ curl -sS \
   "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?page=1&limit=50"
 ```
 
-Each row includes `service_name`, `method_name`, `grpc_status_code`, `latency_ms`, and stored payloads:
+By default, audit is **metadata-only** — each row includes `service_name`, `method_name`, `grpc_status_code`, `latency_ms`, and `trace_id`. Request and response bodies are not stored or returned unless payload capture is enabled for the project.
+
+### Enable payload capture (optional)
+
+To store and return full bodies, enable the project feature (requires **`PROJECT_ADMIN`**):
+
+```bash
+curl -sS -X PUT \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"value": "true"}' \
+  "$API/core/api/v1/projects/$PROJECT_ID/features/feature.rpc.payload_capture.enabled"
+```
+
+Set `"value": "false"` to disable. Only registry keys with **`user_enabled: true`** are writable via the project features API — operator-controlled keys are not exposed here.
+
+When enabled, bodies are captured at invoke time (capped at **64 KiB** each) and returned on the invocations query:
 
 | Field | Shape |
 |-------|-------|
-| `req_payload` | JSON object when the request was Connect JSON; base64 string when the request was protobuf wire |
-| `resp_payload` | JSON object when the response was Connect JSON; base64 string when the response was protobuf wire |
+| `req_payload` | JSON object for Connect JSON requests; base64 string for protobuf wire |
+| `resp_payload` | JSON object for Connect JSON responses; base64 string for protobuf wire |
 
-Omitted when no payload was captured for that invocation.
+Omitted when capture was disabled at invoke time or the body was empty.
 
 ## Local development
 

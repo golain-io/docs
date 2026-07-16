@@ -220,7 +220,9 @@ curl -sS \
 
 **Response:** `ok: 1`, `data.items[]`, and pagination `meta` (`page`, `limit`, `total`).
 
-**Each item:**
+By default, audit is **metadata-only** — no request or response bodies are stored or returned.
+
+**Each item (always present):**
 
 | Field | Description |
 |-------|-------------|
@@ -230,10 +232,38 @@ curl -sS \
 | `grpc_status_code` | gRPC status code |
 | `latency_ms` | Round-trip latency |
 | `trace_id` | Trace identifier |
+
+**Payload fields (when capture enabled):**
+
+| Field | Description |
+|-------|-------------|
 | `req_payload` | Request body — JSON object for Connect JSON calls; base64 string for protobuf wire |
 | `resp_payload` | Response body — JSON object for Connect JSON calls; base64 string for protobuf wire |
 
-Fields are omitted when no payload was stored for that invocation.
+Omitted when payload capture was disabled at invoke time or the body was empty. When capture is enabled, each body is stored up to **64 KiB** (truncated beyond that).
+
+### Enable payload capture
+
+Payload capture is off by default. Enable per project:
+
+```
+PUT /core/api/v1/projects/{project_id}/features/feature.rpc.payload_capture.enabled
+```
+
+**Permission:** `PROJECT_ADMIN`
+
+**Body:** `{ "value": "true" }` to enable; `{ "value": "false" }` to disable.
+
+```bash
+curl -sS -X PUT \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"value": "true"}' \
+  "$API/projects/$PROJECT_ID/features/feature.rpc.payload_capture.enabled"
+```
+
+Only feature registry keys with **`user_enabled: true`** can be read or written via this API. Other keys are operator-controlled and return `404 feature not found`.
 
 ---
 
