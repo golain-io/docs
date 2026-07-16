@@ -222,8 +222,8 @@ curl -sS -X PUT \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -d '{"key":"feature.rpc.payload_capture.enabled","value":"true"}' \
-  "$API/core/api/v1/projects/$PROJECT_ID/features"
+  -d '{"value":"true"}' \
+  "$API/core/api/v1/projects/$PROJECT_ID/features/feature.rpc.payload_capture.enabled"
 ```
 
 Set `"value": "false"` to disable. Only registry keys with **`user_enabled: true`** are writable via the project features API — operator-controlled keys are not exposed here.
