@@ -81,10 +81,27 @@ POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/{Ser
 |--------|-------|
 | `Authorization` | `Bearer {oidc_access_token}` |
 | `ORG-ID` | Organization UUID |
-| `Content-Type` | `application/json` |
-| `Connect-Protocol-Version` | `1` |
+| `Content-Type` | See [Content-Type matrix](#content-type-matrix) below — `application/json` for curl and scripts |
 
 Same authentication as the Console and `/core/api/v1` — see [Platform concepts — Authentication](/getting-started/concepts#authentication).
+
+`Connect-Protocol-Version: 1` is **optional** for Connect JSON (`application/json` or empty `Content-Type`). The proxy injects it when absent.
+
+## Content-Type matrix
+
+The proxy transcodes request bodies based on `Content-Type`. Response shape follows the request encoding on unary sync invoke.
+
+### Unary sync invoke (`POST .../{Service}/{Method}`)
+
+| `Content-Type` | Request body | Response |
+|----------------|--------------|----------|
+| `application/json` or empty | Connect JSON object matching the protobuf **request** message | Connect JSON matching the **response** message |
+| `application/proto` | Connect binary framing (generated Connect clients) | Connect binary via Vanguard |
+| `application/x-protobuf` | Raw gRPC/protobuf wire bytes (no Connect envelope) | `application/proto` wire bytes (fast path, no Vanguard) |
+
+<Note>
+  For curl and scripts, use **`application/json`** with a JSON object — you do not need `Connect-Protocol-Version`. Generated Connect or gRPC clients can send `application/proto` or `application/x-protobuf` instead.
+</Note>
 
 ## Example: Echo unary call
 
@@ -97,7 +114,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -d '{"message":"hello from cloud"}'
 ```
 
@@ -126,10 +142,19 @@ POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/stre
 |--------|-------|
 | `Authorization` | `Bearer {oidc_access_token}` |
 | `ORG-ID` | Organization UUID |
-| `Content-Type` | `application/json` |
+| `Content-Type` | `application/json` (default for curl) — see stream matrix below |
 | `Accept` | `text/event-stream` |
 
 Use **`curl -N`** (no buffer) so events print as they arrive. Optional `?session_id=` works the same as unary invoke.
+
+### Stream request `Content-Type`
+
+| `Content-Type` | Request body |
+|----------------|--------------|
+| `application/json` or empty | JSON object — proxy transcodes to protobuf wire before relaying to the device |
+| `application/proto` or `application/x-protobuf` | Naked protobuf wire bytes — passed through as-is |
+
+Response is always **SSE** with base64 protobuf frames in `message` events (unchanged).
 
 ### Example: EchoServerStream
 
@@ -186,7 +211,14 @@ curl -sS \
   "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?page=1&limit=50"
 ```
 
-Each row includes `service_name`, `method_name`, `grpc_status_code`, `latency_ms`, and payload digests — not raw request/response bodies.
+Each row includes `service_name`, `method_name`, `grpc_status_code`, `latency_ms`, and stored payloads:
+
+| Field | Shape |
+|-------|-------|
+| `req_payload` | JSON object when the request was Connect JSON; base64 string when the request was protobuf wire |
+| `resp_payload` | JSON object when the response was Connect JSON; base64 string when the response was protobuf wire |
+
+Omitted when no payload was captured for that invocation.
 
 ## Local development
 
@@ -208,7 +240,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -d '{"message":"ping"}'
 
 # Server stream
@@ -263,7 +294,7 @@ Use the sync path for unary methods and `/streams/` for `server_stream` methods 
 → [Troubleshooting](/edge/device-rpc/troubleshooting)
 
 <Note>
-  **Connect JSON** (`Content-Type: application/json`, `Connect-Protocol-Version: 1`) is the simplest path for unary curl and scripts. The same unary URL also accepts **Connect binary** and **gRPC** via content negotiation if you use generated clients.
+  **Connect JSON** (`Content-Type: application/json`) is the simplest path for unary curl and scripts — `Connect-Protocol-Version` is optional. The same unary URL also accepts **Connect binary** (`application/proto`) and **raw protobuf wire** (`application/x-protobuf`) when using generated clients.
 </Note>
 
 ## Related

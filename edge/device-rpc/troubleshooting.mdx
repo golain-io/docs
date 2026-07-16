@@ -51,6 +51,8 @@ flowchart TD
 | Outdated method list after OTA | Stale schema binding | [Stale schema after OTA](#stale-schema-after-ota) |
 | Queued call stuck or expired | Device offline past TTL | [Queued stuck or duplicates](#queued-stuck-or-duplicates) |
 | Duplicate side effects from queued RPC | Handler not idempotent | [Queued idempotency](#queued-idempotency) |
+| `invalid json request body` (400) on stream | Wrong `Content-Type` or malformed JSON for stream open | [Content-Type and transcoding](#content-type-and-transcoding) |
+| `unsupported content type` (415) on stream | Connect binary or gRPC-Web on `/streams/` path | [Content-Type and transcoding](#content-type-and-transcoding) |
 | Schema never appears after device connects | Self-hosted stack misconfiguration | [Self-hosted operators](#self-hosted-operators) |
 
 ---
@@ -116,7 +118,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -d '{"message":"diagnostic ping"}'
 ```
 
@@ -212,7 +213,7 @@ Only **unary** methods use the sync path. **Server-stream** methods use `/stream
 
 | Method type | Correct cloud path |
 |-------------|-------------------|
-| `unary` | `POST $RPC_PROXY/.../{Service}/{Method}` with Connect JSON headers |
+| `unary` | `POST $RPC_PROXY/.../{Service}/{Method}` with `Content-Type: application/json` (or generated client encodings) |
 | `server_stream` | `POST $RPC_PROXY/.../streams/{Service}/{Method}` with `Accept: text/event-stream` and `curl -N` |
 | `client_stream`, `bidi_stream` | Device only — not available from cloud |
 
@@ -229,6 +230,37 @@ curl -N -X POST \
 ```
 
 For client-stream and bidi methods (`EchoClientStream`, `EchoBidiStream`), use device-local tooling — the cloud does not expose these shapes.
+
+---
+
+## Content-Type and transcoding
+
+**Symptoms:**
+
+- HTTP **400** with `"invalid json request body"` when opening a server stream with `Content-Type: application/json`
+- HTTP **415** with `"unsupported content type"` on the `/streams/` path
+- Unary invoke with `application/x-protobuf` returns wire bytes instead of JSON — caller expected Connect JSON
+
+**Cause:**
+
+The RPC proxy transcodes request bodies by path and `Content-Type`. Server streams accept **`application/json`** (transcoded to wire), **`application/proto`**, or **`application/x-protobuf`** (passthrough). Connect binary framing (`application/proto`) is **not** supported on the stream path — use JSON or raw wire.
+
+Unary sync invoke returns Connect JSON only when you send `application/json` (or empty `Content-Type`). `application/x-protobuf` uses the fast wire path and responds with `application/proto`.
+
+**Fix:**
+
+| Goal | Path | `Content-Type` | Body |
+|------|------|----------------|------|
+| Curl unary Echo | `/{Service}/{Method}` | `application/json` | `{"message":"…"}` |
+| Curl server stream | `/streams/{Service}/{Method}` | `application/json` | `{"message":"…"}` |
+| Generated client, raw wire | either path (stream: wire only) | `application/x-protobuf` | protobuf-encoded request |
+| Generated Connect client (unary) | `/{Service}/{Method}` | `application/proto` | Connect binary framing |
+
+`Connect-Protocol-Version: 1` is optional for JSON unary — the proxy injects it when absent.
+
+Match field names and types to the protobuf request message. A typo or wrong type in JSON fails protojson unmarshaling on the stream path with **400** `invalid json request body`.
+
+→ Full matrix: [Invoking methods — Content-Type matrix](/edge/device-rpc/invoking-methods#content-type-matrix)
 
 ---
 
@@ -292,7 +324,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -H "Idempotency-Key: $(uuidgen)" \
   -d '{"message":"retry when online"}'
 ```
@@ -350,7 +381,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -d '{"message":"diagnostic ping"}'
 ```
 

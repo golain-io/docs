@@ -48,8 +48,7 @@ POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/enqu
 |--------|-------|
 | `Authorization` | `Bearer {oidc_access_token}` |
 | `ORG-ID` | Organization UUID |
-| `Content-Type` | `application/json` |
-| `Connect-Protocol-Version` | `1` |
+| `Content-Type` | `application/json` for JSON payloads — body is stored **as-is** (no proxy transcoding) |
 | `Idempotency-Key` | **Recommended** — unique per logical enqueue |
 
 ### Example
@@ -67,7 +66,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -H "Idempotency-Key: $IDEM_KEY" \
   -d '{"message":"hello when online"}'
 ```
@@ -83,7 +81,11 @@ curl -sS -X POST \
 }
 ```
 
-Save `call_id` for polling. The request body uses the same protobuf schema rules as [sync invoke](/edge/device-rpc/invoking-methods).
+Save `call_id` for polling.
+
+<Warning>
+  Enqueue stores the request body **as-is** — the proxy does not JSON→protobuf transcode. For JSON queued calls, send the same JSON object you would use on sync invoke; the device receives that stored payload at delivery time. For wire-format delivery, send `application/x-protobuf` bytes directly.
+</Warning>
 
 ### ttl_seconds
 
@@ -180,7 +182,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -H "Idempotency-Key: $(uuidgen)" \
   -d '{"message":"queued ping"}'
 
