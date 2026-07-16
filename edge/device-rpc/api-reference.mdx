@@ -247,20 +247,20 @@ Omitted when payload capture was disabled at invoke time or the body was empty. 
 Payload capture is off by default. Enable per project:
 
 ```
-PUT /core/api/v1/projects/{project_id}/features/feature.rpc.payload_capture.enabled
+PUT /core/api/v1/projects/{project_id}/features
 ```
 
 **Permission:** `PROJECT_ADMIN`
 
-**Body:** `{ "value": "true" }` to enable; `{ "value": "false" }` to disable.
+**Body:** `{ "key": "feature.rpc.payload_capture.enabled", "value": "true" }` to enable; `"value": "false"` to disable.
 
 ```bash
 curl -sS -X PUT \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -d '{"value": "true"}' \
-  "$API/projects/$PROJECT_ID/features/feature.rpc.payload_capture.enabled"
+  -d '{"key":"feature.rpc.payload_capture.enabled","value":"true"}' \
+  "$API/projects/$PROJECT_ID/features"
 ```
 
 Only feature registry keys with **`user_enabled: true`** can be read or written via this API. Other keys are operator-controlled and return `404 feature not found`.
