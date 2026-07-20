@@ -1,0 +1,260 @@
+---
+title: Asset tree
+description: Model physical hierarchies as a recursive asset tree — types, group assets, links to devices and fleets, and moves.
+---
+
+The **asset tree** is the foundation of Golain's asset management: every physical thing you track — a plant, a production line, a machine, a bolt — is a row in one recursive `assets` structure. Parent/child links build the tree; **asset types** classify each node; optional **links** connect an asset to a Device, Fleet, or Project you already manage.
+
+## Glossary
+
+| Term | Meaning |
+|------|---------|
+| **Asset** | A node in the tree. Has a name, a type, an optional parent, and an optional link to a platform entity. |
+| **Asset type** | A Project-scoped category (for example `plant`, `pump`, `bolt`) that classifies assets. Types can nest too — a `centrifugal_pump` type can have a parent type `pump`. |
+| **Tag** | The asset's human-readable code (for example `PUMP-014`), unique within the Project. Not the same as [device tags](/getting-started/concepts#tags-and-targeting) used for OTA/filtering. |
+| **Group asset** | An asset with `is_group: true` and a `quantity`, representing a set tracked as one unit (for example "1000 bolts") rather than 1,000 individual rows. |
+| **Linked entity** | A Device, Fleet, or Project that an asset node represents. Set once via the link endpoint; the console/API can then jump from the asset to that entity's detail view. |
+| **Criticality** | A 1 (highest) to 5 (lowest) priority used by maintenance and reporting. |
+| **Status** | One of `active`, `inactive`, `in_maintenance`, `standby`, or `decommissioned`. |
+
+## How the tree fits together
+
+- Assets nest arbitrarily deep under a **Project** — Plant → Building → Line → Station → Machine → Component, or any shape your industry needs. There's no fixed number of levels.
+- **Asset types carry the meaning.** Whether a node is a "zone", a "line", or a "module" is determined entirely by its asset type, not by a fixed platform enum — define whatever taxonomy fits your plant.
+- A node can **link** to an existing Device (a sensor or PLC), a Fleet (a group of devices, for example an HVAC fleet), or a Project. Linking is how an asset like "Spindle Motor" points at the Device that reports its telemetry.
+- Moving an asset re-parents its whole subtree; Golain rejects moves that would create a cycle.
+
+## Prerequisites
+
+- A Project you can manage. See [Platform concepts](/getting-started/concepts).
+- `can_manage_assets` permission for create/update/delete/move/link/status calls. Read (`GET`) calls use your normal project access.
+- Set these before running the examples:
+
+```bash
+export API=https://api.ilyama.golain.io/core/api/v1
+export TOKEN=…          # OIDC access token
+export ORG_ID=…         # Organization UUID
+export PROJECT_ID=…
+```
+
+Every request sends:
+
+```bash
+-H "Authorization: Bearer $TOKEN" \
+-H "ORG-ID: $ORG_ID"
+```
+
+## Key endpoints
+
+### Asset types
+
+| Method & path | Purpose |
+|----------------|---------|
+| `GET /projects/{project_id}/asset-types` | List asset types |
+| `POST /projects/{project_id}/asset-types` | Create an asset type |
+| `GET /projects/{project_id}/asset-types/{asset_type_id}` | Get one asset type |
+| `PATCH /projects/{project_id}/asset-types/{asset_type_id}` | Update an asset type |
+| `DELETE /projects/{project_id}/asset-types/{asset_type_id}` | Delete an asset type |
+
+### Assets
+
+| Method & path | Purpose |
+|----------------|---------|
+| `GET /projects/{project_id}/assets` | List assets |
+| `POST /projects/{project_id}/assets` | Create an asset |
+| `GET /projects/{project_id}/assets/{asset_id}` | Get one asset |
+| `GET /projects/{project_id}/assets/{asset_id}/tree` | Get an asset and its full subtree |
+| `PATCH /projects/{project_id}/assets/{asset_id}` | Update an asset |
+| `DELETE /projects/{project_id}/assets/{asset_id}` | Delete an asset (cascades to its subtree) |
+| `POST /projects/{project_id}/assets/{asset_id}/move` | Re-parent an asset |
+| `POST /projects/{project_id}/assets/{asset_id}/link` | Link the asset to a Device, Fleet, or Project |
+| `POST /projects/{project_id}/assets/{asset_id}/status` | Change the asset's status |
+
+## Create an asset type
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "key": "centrifugal_pump",
+    "name": "Centrifugal pump",
+    "equipment_class": "rotating",
+    "default_criticality": 2
+  }' \
+  "$API/projects/$PROJECT_ID/asset-types"
+```
+
+```json
+{
+  "ok": 1,
+  "data": {
+    "item": {
+      "id": "…",
+      "key": "centrifugal_pump",
+      "name": "Centrifugal pump",
+      "equipment_class": "rotating",
+      "default_criticality": 2
+    }
+  }
+}
+```
+
+`equipment_class` and `equipment_type` are optional free-text classifiers useful for failure analysis and reporting (for example `rotating`, `static`, `electrical`, `instrument`). `attribute_schema` (a JSON schema) lets you validate structured metadata on assets of this type.
+
+## Create the top of a tree
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "asset_type_id": "'"$PLANT_TYPE_ID"'",
+    "tag": "PLANT-01",
+    "name": "Main plant"
+  }' \
+  "$API/projects/$PROJECT_ID/assets"
+```
+
+Save the returned asset ID, then create a child by passing `parent_asset_id`:
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "asset_type_id": "'"$PUMP_TYPE_ID"'",
+    "parent_asset_id": "'"$PLANT_ASSET_ID"'",
+    "tag": "PUMP-014",
+    "name": "Feed pump 14",
+    "criticality": 2
+  }' \
+  "$API/projects/$PROJECT_ID/assets"
+```
+
+`tag` must be unique within the Project — use it as the human-readable asset code your maintenance team already recognizes.
+
+## Track a set as one asset ("1000 bolts")
+
+Create a group asset instead of 1,000 individual rows:
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "asset_type_id": "'"$BOLT_TYPE_ID"'",
+    "parent_asset_id": "'"$MACHINE_ASSET_ID"'",
+    "tag": "BOLT-SET-01",
+    "name": "Mounting bolts",
+    "is_group": true,
+    "quantity": 1000
+  }' \
+  "$API/projects/$PROJECT_ID/assets"
+```
+
+If one bolt in the set needs individual lifecycle tracking, create it as a normal (non-group) child asset under the group.
+
+## Link an asset to a Device or Fleet
+
+Link a machine node to the Device that reports its telemetry:
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "linked_entity_type": "device",
+    "linked_entity_id": "'"$DEVICE_ID"'"
+  }' \
+  "$API/projects/$PROJECT_ID/assets/$ASSET_ID/link"
+```
+
+`linked_entity_type` is one of `device`, `fleet`, or `project`. You can also pass `linked_entity_type` / `linked_entity_id` on create instead of a separate call.
+
+## Read the tree
+
+Fetch a single asset:
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/assets/$ASSET_ID"
+```
+
+Fetch an asset and its full subtree in one call:
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/assets/$ASSET_ID/tree"
+```
+
+List all assets in the Project (paginated):
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/assets?page=1&limit=50"
+```
+
+## Update, move, and change status
+
+Partial update (only send fields you're changing):
+
+```bash
+curl -sS -X PATCH \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"name": "Feed pump 14 (rebuilt)", "criticality": 1}' \
+  "$API/projects/$PROJECT_ID/assets/$ASSET_ID"
+```
+
+Move an asset (and its subtree) under a new parent:
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"new_parent_id": "'"$NEW_PARENT_ASSET_ID"'"}' \
+  "$API/projects/$PROJECT_ID/assets/$ASSET_ID/move"
+```
+
+Change status (for example when taking an asset offline for maintenance):
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"status": "in_maintenance"}' \
+  "$API/projects/$PROJECT_ID/assets/$ASSET_ID/status"
+```
+
+## Delete an asset
+
+Deleting an asset removes its entire subtree — confirm you have the right node before calling this:
+
+```bash
+curl -sS -X DELETE \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/assets/$ASSET_ID"
+```
+
+## Next steps
+
+- [Counters](/assets/counters) — attach telemetry-driven counters to any asset node
+- [Maintenance](/assets/maintenance) — trigger work orders from asset status and counters
+- [Alarms](/assets/alarms) — attach alarm definitions to asset nodes
+- [Overview](/assets/overview) — how the asset tree fits with counters, maintenance, and materials

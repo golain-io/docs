@@ -1,0 +1,173 @@
+---
+title: Alarms
+description: ISA-18.2 alarm definitions and instances — lifecycle, acknowledgment, shelving, and automatic work orders.
+---
+
+**Alarms** are first-class in Golain, not a special kind of ticket. An alarm definition describes an abnormal process condition worth calling out (for example, a temperature setpoint or a vibration threshold). When the condition is true, Golain opens an **alarm instance** that an operator acknowledges and that clears when the condition resolves.
+
+This model follows **ISA-18.2**, the standard alarm management practice used in process industries: alarm state is tracked on two independent axes — whether the process condition is active, and whether an operator has acknowledged it.
+
+## Definitions vs. instances
+
+| Concept | What it holds | Changes how often |
+|---------|----------------|--------------------|
+| **Alarm definition** | The rationalized, reusable rule: condition, priority, consequence, response procedure, dedup timing, and whether it should raise a work order | Rarely — set once during commissioning, revisited during periodic rationalization |
+| **Alarm instance** | One activation of a definition on one asset: when it opened, who acknowledged it, when it cleared | Continuously — one row per activation |
+
+A definition can apply to a single asset or to every asset of an asset type (for example, "high vibration" on all pumps). Each matching asset gets its own independent instances.
+
+## Lifecycle
+
+Every alarm instance has two independent states:
+
+| Axis | Values | Meaning |
+|------|--------|---------|
+| **Process state** | `active` → `normal` | Whether the underlying condition is currently true |
+| **Ack state** | `unacknowledged` → `acknowledged` | Whether an operator has seen and accepted the alarm |
+
+These move independently — an alarm can clear before anyone acknowledges it, or stay active long after it's been acknowledged. A typical instance moves through:
+
+1. **Activated** — the condition became true; the instance opens as `active` / `unacknowledged`.
+2. **Acknowledged** — an operator confirms they've seen it. Process state doesn't change.
+3. **Cleared** — the condition resolves; process state moves to `normal`. The instance stays visible until cleared, regardless of ack state.
+
+### Shelving
+
+Operators can **shelve** a noisy or known-bad alarm instance for a bounded window (`shelved_until`) with a reason. While shelved, the alarm definition won't raise new activations for that asset. Shelving always expires — either an operator **unshelves** it early, or it unshelves automatically once `shelved_until` passes. Definitions also cap the maximum shelve duration (`shelve_max_hours`), so an alarm can't be silenced indefinitely by mistake.
+
+<Note>
+  Taking a definition fully out of service (`is_active = false`) is a separate, heavier action from shelving an instance — reserve it for alarms that no longer apply, and expect it to require management-level access.
+</Note>
+
+## Why alarms don't flood you: dedup at the signal level
+
+Before an alarm ever reaches an operator or creates a work order, Golain applies dedup rules directly on the condition evaluation — the same techniques used in industrial alarm rationalization:
+
+| Setting | What it does | Why it matters |
+|---------|----------------|-----------------|
+| **Deadband** | Requires the value to fall a margin *below* the trigger before the alarm clears (for example, trigger at 80, clear at 75) | Stops an alarm from flapping active/clear when a value hovers right at the setpoint |
+| **On-delay** | The condition must stay true for N continuous seconds before the instance activates | Filters out brief spikes and sensor noise that don't reflect a real sustained condition |
+| **Off-delay** | Keeps the instance active for N seconds after the condition clears | Avoids a flicker of "cleared then active again" during a marginal recovery |
+| **Re-alarm delay** | After clearing, suppresses a new activation of the same definition for a minimum interval | Stops the same underlying issue from re-triggering over and over while it's being worked |
+
+Getting these right during rationalization is what keeps an alarm list usable — too little dedup and operators get chattering noise; too much and a real recurring problem gets hidden.
+
+## Automatic work orders
+
+An alarm definition can be configured to raise a work order automatically when it activates (`auto_create_wo`). In plain terms: **the alarms module never creates a ticket or work order itself.** Instead, activating an alarm publishes an event that the maintenance ticketing system picks up and evaluates against its own intake rules — the same intake path used for any other automated trigger.
+
+That intake step applies its own filtering and dedup before a work order is created:
+
+- A filter condition can restrict auto-creation to certain priorities (for example, only critical and high-priority alarms).
+- A dedup key plus a cooldown window prevents the same alarm from spawning duplicate work orders while one is already open.
+- The resulting work order is tagged back to the alarm instance that triggered it, and the work order workflow to use comes from the alarm definition (or the project's default work order workflow if none is set).
+
+This keeps alarm dedup (signal-level, sub-second) and work order dedup (ticket-level, minutes-to-days) as two separate concerns, each tuned for its own timescale. See [Maintenance](/assets/maintenance) for how work orders progress once created.
+
+## API
+
+Set these before running the examples below:
+
+```bash
+export API=https://api.ilyama.golain.io/core/api/v1
+export TOKEN=<your-oidc-access-token>
+export ORG_ID=<your-org-uuid>
+export PROJECT_ID=<your-project-uuid>
+```
+
+All requests need `Authorization: Bearer $TOKEN` and `ORG-ID: $ORG_ID`. See [Authentication](/api-reference/authentication) for how to obtain a token, and [API quickstart](/assets/api-quickstart) for the full header and permission model.
+
+### Alarm definitions
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/projects/{project_id}/alarm-definitions` | List definitions |
+| `POST` | `/projects/{project_id}/alarm-definitions` | Create a definition |
+| `GET` | `/projects/{project_id}/alarm-definitions/{alarm_def_id}` | Get one definition |
+| `PATCH` | `/projects/{project_id}/alarm-definitions/{alarm_def_id}` | Update fields (send `_keys`) |
+| `DELETE` | `/projects/{project_id}/alarm-definitions/{alarm_def_id}` | Delete a definition |
+| `POST` | `/projects/{project_id}/alarm-definitions/{alarm_def_id}/activate` | Re-enable a deactivated definition |
+| `POST` | `/projects/{project_id}/alarm-definitions/{alarm_def_id}/deactivate` | Stop new activations without deleting history |
+
+Creating a definition:
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{
+    "asset_id": "'"$ASSET_ID"'",
+    "key": "high-vibration",
+    "name": "High vibration",
+    "priority": 2,
+    "condition_cel": "event.vibration_mm_s > 7.0",
+    "deadband": 0.5,
+    "on_delay_seconds": 10,
+    "re_alarm_delay_seconds": 300,
+    "auto_create_wo": true,
+    "wo_cooldown": "24h"
+  }' \
+  "$API/projects/$PROJECT_ID/alarm-definitions"
+```
+
+`priority` runs `1` (critical) through `5` (advisory). `condition_cel` and `clear_cel` (optional — defaults to the condition going false, with deadband applied) are CEL expressions evaluated against incoming telemetry.
+
+### Alarm instances
+
+| Method | Path | Purpose |
+|--------|------|---------|
+| `GET` | `/projects/{project_id}/alarm-instances` | List instances (filter by `alarm_def_id`, `asset_id`, `process_state`, `ack_state`) |
+| `GET` | `/projects/{project_id}/alarm-instances/active` | List only currently active instances |
+| `GET` | `/projects/{project_id}/alarm-instances/{alarm_instance_id}` | Get one instance |
+| `POST` | `/projects/{project_id}/alarm-instances/{alarm_instance_id}/acknowledge` | Acknowledge |
+| `POST` | `/projects/{project_id}/alarm-instances/{alarm_instance_id}/shelve` | Shelve until a given time |
+| `POST` | `/projects/{project_id}/alarm-instances/{alarm_instance_id}/unshelve` | Unshelve early |
+
+List what's currently active:
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/alarm-instances/active"
+```
+
+Acknowledge an instance:
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/alarm-instances/$ALARM_INSTANCE_ID/acknowledge"
+```
+
+Shelve an instance for four hours with a reason:
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "shelved_until": "2026-07-20T18:00:00Z",
+    "shelve_reason": "sensor recalibration in progress"
+  }' \
+  "$API/projects/$PROJECT_ID/alarm-instances/$ALARM_INSTANCE_ID/shelve"
+```
+
+### Permissions
+
+Creating, updating, deleting, activating, or deactivating an **alarm definition** requires the project's **`can_manage_assets`** permission — the same one that governs assets, counters, and maintenance plans. See [API quickstart — permissions](/assets/api-quickstart#permissions). Reading definitions and instances, and acknowledging or shelving an instance, only requires access to the underlying asset.
+
+## Alarm KPIs
+
+Alarm activation rate (activations per hour, from the activity log) is live today. The more advanced ISA-18.2 / EEMUA 191 panels — standing alarms, chattering, nuisance ratio, and alarm-based MTBF/MTTR — are coming online as the underlying data surfaces mature. There's no separate HTTP endpoint for alarm KPIs; they render as dashboard panels the same way other maintenance KPIs do. See [KPIs and reporting](/assets/kpis-and-reporting).
+
+## Related
+
+- [Maintenance](/assets/maintenance) — how auto-created work orders progress
+- [Counters](/assets/counters) — the telemetry that often feeds alarm conditions
+- [KPIs and reporting](/assets/kpis-and-reporting) — alarm rate and other maintenance KPIs
+- [API quickstart](/assets/api-quickstart) — headers, permissions, and idempotency

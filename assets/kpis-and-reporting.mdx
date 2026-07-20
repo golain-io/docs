@@ -1,0 +1,80 @@
+---
+title: KPIs and reporting
+description: OEE, MTBF/MTTR, PM compliance, WO backlog, alarm rates, and MRO spend — how Golain turns maintenance data into dashboards.
+---
+
+Golain doesn't ship a separate reporting engine for asset management. Instead, every asset, counter, work order, alarm, and material movement is written once and made available to the platform's dashboard and query infrastructure — the same one used elsewhere on the platform. The KPIs below are prebuilt on top of that data.
+
+## What you get
+
+| KPI | What it tells you |
+|-----|---------------------|
+| **OEE** (Overall Equipment Effectiveness) | How much of an asset's potential output you're actually getting |
+| **MTBF / MTTR** | How often assets fail, and how long it takes to bring them back |
+| **PM compliance** | Whether scheduled maintenance is happening on time |
+| **WO backlog** | How many work orders are open, and how long they've been sitting |
+| **Alarm rates** | How busy the alarm system is, and (as data matures) whether it's noisy |
+| **MRO spend trends** | Where maintenance, repair, and operations budget is going |
+
+These render as dashboard panels once your project has assets, counters, maintenance plans, and alarms configured — you don't need to know the internal panel definitions to use them.
+
+## OEE
+
+```
+OEE = Availability × Performance × Quality
+```
+
+- **Availability** — the share of scheduled time the asset was actually running, capped at 100%.
+- **Performance** — actual output against the theoretical maximum for the time it ran, capped at 100%.
+- **Quality** — the share of output that was good, not scrap or rework.
+
+<Note>
+  Quality currently defaults to **100%** — there's no dedicated quality/scrap counter series yet, so OEE today reduces to Availability × Performance. Feed a quality counter once you're tracking good vs. total units and this fills in automatically.
+</Note>
+
+## MTBF / MTTR
+
+**MTBF** (Mean Time Between Failures) and **MTTR** (Mean Time To Repair) are the standard reliability pair:
+
+- **MTBF** — on average, how long an asset runs between failures. Higher is better.
+- **MTTR** — on average, how long a failure takes to resolve, from when it's reported to when the asset is back in service. Lower is better.
+
+Golain computes these from failure reports linked to work orders, and — for alarm-triggered failures — from the alarm's own open/clear timestamps. When a failure leads to a work order, the more accurate MTTR uses the work order's completion time rather than just the alarm clearing, since a condition can clear before the underlying issue is actually fixed. Targets for both vary by equipment class, so dashboards group results by asset type.
+
+## PM compliance
+
+Compares scheduled preventive maintenance (from your [maintenance plans](/assets/maintenance) and [schedules](/assets/scheduler)) against what actually happened, so you can see slippage before it becomes a bigger failure.
+
+## WO backlog
+
+Tracks how many work orders are open and how long they've been in each stage, so aging and bottlenecks in the maintenance workflow are visible at a glance.
+
+## Alarm rates
+
+Activations per hour is live today. The deeper ISA-18.2 panels — standing alarms, chattering, nuisance ratio — are coming online as data surfaces mature. See [Alarms — Alarm KPIs](/assets/alarms#alarm-kpis) for the current state.
+
+## MRO spend
+
+```
+spend = quantity × unit price, grouped by material and asset
+```
+
+<Note>
+  Unit price is currently a placeholder value on most fixtures — spend totals are directional (good for relative comparisons across materials or assets) rather than exact dollar figures until vendor pricing is wired in from [procurement](/assets/materials).
+</Note>
+
+## Where this data comes from
+
+Every mutation across the asset, maintenance, materials, and alarms domains is recorded in a shared activity log — asset changes, work order transitions, material movements, alarm activations, and more. That log is what backs cross-domain KPIs like alarm-to-work-order correlation, material consumption per asset, and procurement cycle time, without any of those domains needing to know about each other.
+
+## Viewing KPIs
+
+The primary way to consume KPIs is the console dashboard for your project, or the same query surface via the API if you're integrating externally. There's no need to reach into internal panel or query definitions — open the relevant dashboard, or call the platform API for the underlying resource data (work orders, counters, alarms, movements) and chart it yourself. See [API quickstart](/assets/api-quickstart) for the resource paths.
+
+## Related
+
+- [Alarms](/assets/alarms) — activation lifecycle and dedup that feeds alarm rate KPIs
+- [Maintenance](/assets/maintenance) — work orders and failure reports behind MTBF/MTTR and WO backlog
+- [Counters](/assets/counters) — the running-hours and output data behind OEE
+- [Materials](/assets/materials) — movements and procurement behind MRO spend
+- [API quickstart](/assets/api-quickstart) — pulling the underlying resource data yourself

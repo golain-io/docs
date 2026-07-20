@@ -1,6 +1,42 @@
 {
   "components": {
     "parameters": {
+      "ConnectProtocolVersion": {
+        "description": "Connect protocol version. Use `1` for JSON unary invoke and enqueue.",
+        "in": "header",
+        "name": "Connect-Protocol-Version",
+        "required": true,
+        "schema": {
+          "default": "1",
+          "enum": [
+            "1"
+          ],
+          "type": "string"
+        }
+      },
+      "DeviceRPCSessionId": {
+        "description": "Optional UUID that groups invocation traces for audit queries.",
+        "in": "query",
+        "name": "session_id",
+        "required": false,
+        "schema": {
+          "format": "uuid",
+          "type": "string"
+        }
+      },
+      "DeviceRPCStreamAccept": {
+        "description": "Must be `text/event-stream` for server-streaming Device RPC.",
+        "in": "header",
+        "name": "Accept",
+        "required": true,
+        "schema": {
+          "default": "text/event-stream",
+          "enum": [
+            "text/event-stream"
+          ],
+          "type": "string"
+        }
+      },
       "IdempotencyKey": {
         "description": "Optional client dedupe key forwarded to the domain worker RPC for safe retries.",
         "in": "header",
@@ -703,6 +739,176 @@
             "type": "string"
           }
         },
+        "type": "object"
+      },
+      "DeviceRPCInvocationItem": {
+        "properties": {
+          "device_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "grpc_status_code": {
+            "type": "integer"
+          },
+          "latency_ms": {
+            "type": "integer"
+          },
+          "method_name": {
+            "type": "string"
+          },
+          "req_payload": {
+            "description": "Present only when rpc_payload_capture is enabled for the project; JSON or base64 string for protobuf wire.",
+            "nullable": true
+          },
+          "resp_payload": {
+            "description": "Present only when rpc_payload_capture is enabled for the project; JSON or base64 string for protobuf wire.",
+            "nullable": true
+          },
+          "service_name": {
+            "type": "string"
+          },
+          "session_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "time": {
+            "description": "Invocation timestamp (timestamptz rendered as text).",
+            "type": "string"
+          },
+          "trace_id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "time",
+          "device_id",
+          "service_name",
+          "method_name",
+          "grpc_status_code",
+          "latency_ms"
+        ],
+        "type": "object"
+      },
+      "DeviceRPCInvocationsResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/DeviceRPCInvocationItem"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "type": "object"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "ok": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "meta"
+        ],
+        "type": "object"
+      },
+      "DeviceRPCMethodDef": {
+        "properties": {
+          "method_descriptor": {
+            "description": "Opaque JSON method descriptor when present.",
+            "nullable": true
+          },
+          "method_type": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "method_type"
+        ],
+        "type": "object"
+      },
+      "DeviceRPCProtoFileDef": {
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "package": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "package"
+        ],
+        "type": "object"
+      },
+      "DeviceRPCServiceDef": {
+        "properties": {
+          "methods": {
+            "items": {
+              "$ref": "#/components/schemas/DeviceRPCMethodDef"
+            },
+            "type": "array"
+          },
+          "name": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "methods"
+        ],
+        "type": "object"
+      },
+      "DeviceRPCServicesResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "descriptor_digest": {
+                "description": "SHA-256 digest of the bound descriptor set; omitted when the device has no descriptor.",
+                "type": "string"
+              },
+              "services": {
+                "items": {
+                  "$ref": "#/components/schemas/DeviceRPCServiceDef"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "services"
+            ],
+            "type": "object"
+          },
+          "meta": {
+            "nullable": true
+          },
+          "ok": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "meta"
+        ],
         "type": "object"
       },
       "DevicesInventoryResponse": {
@@ -2836,40 +3042,107 @@
       },
       "ProjectFeature": {
         "properties": {
-          "id": {
-            "format": "uuid",
-            "type": "string"
+          "default_value": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "description": {
+            "type": [
+              "string",
+              "null"
+            ]
           },
           "key": {
             "type": "string"
           },
-          "org_id": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "project_id": {
-            "format": "uuid",
-            "type": "string"
-          },
-          "updated_at": {
-            "format": "date-time",
+          "project_value": {
+            "description": "Project-level override when set",
             "type": [
               "string",
               "null"
             ]
+          },
+          "user_enabled": {
+            "type": "boolean"
           },
           "value": {
-            "type": [
-              "string",
-              "null"
-            ]
+            "description": "Effective value (project override, else org, else registry default)",
+            "type": "string"
           }
         },
         "required": [
-          "id",
-          "project_id",
-          "org_id",
-          "key"
+          "key",
+          "value",
+          "user_enabled"
+        ],
+        "type": "object"
+      },
+      "ProjectFeatureItemResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "item": {
+                "$ref": "#/components/schemas/ProjectFeature"
+              }
+            },
+            "required": [
+              "item"
+            ],
+            "type": "object"
+          },
+          "ok": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "data"
+        ],
+        "type": "object"
+      },
+      "ProjectFeatureUpdateRequest": {
+        "properties": {
+          "value": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "value"
+        ],
+        "type": "object"
+      },
+      "ProjectFeatureUpdateResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "value": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "key",
+              "value"
+            ],
+            "type": "object"
+          },
+          "ok": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "data"
         ],
         "type": "object"
       },
@@ -3029,6 +3302,51 @@
           },
           "meta": {
             "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "ok": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "meta"
+        ],
+        "type": "object"
+      },
+      "ProjectRPCDescriptorResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "descriptor_bytes": {
+                "description": "Raw FileDescriptorSet bytes (JSON base64).",
+                "format": "byte",
+                "type": "string"
+              },
+              "descriptor_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "digest": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "descriptor_id",
+              "digest",
+              "name",
+              "descriptor_bytes"
+            ],
+            "type": "object"
+          },
+          "meta": {
+            "nullable": true
           },
           "ok": {
             "enum": [
@@ -3377,6 +3695,202 @@
           }
         },
         "required": [
+          "data"
+        ],
+        "type": "object"
+      },
+      "QueuedRPCCallItem": {
+        "properties": {
+          "attempts": {
+            "type": "integer"
+          },
+          "call_id": {
+            "format": "uuid",
+            "type": "string"
+          },
+          "content_type": {
+            "description": "Normalized enqueue Content-Type; drives poll response shape.",
+            "type": "string"
+          },
+          "created_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "expires_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "grpc_message": {
+            "type": "string"
+          },
+          "grpc_status_code": {
+            "type": "integer"
+          },
+          "last_error": {
+            "type": "string"
+          },
+          "method_name": {
+            "type": "string"
+          },
+          "next_attempt_at": {
+            "format": "date-time",
+            "type": "string"
+          },
+          "response": {
+            "oneOf": [
+              {
+                "description": "Base64-encoded response wire when content_type is binary, or when JSON decoding failed (see response_encoding).",
+                "type": "string"
+              },
+              {
+                "additionalProperties": true,
+                "description": "Connect JSON response when content_type is application/json.",
+                "type": "object"
+              }
+            ]
+          },
+          "response_encoding": {
+            "description": "Present when a JSON-typed call could not be decoded and response is base64 wire instead.",
+            "enum": [
+              "base64"
+            ],
+            "type": "string"
+          },
+          "response_format_error": {
+            "description": "Stable reason when response_encoding is set (JSON decode fallback).",
+            "type": "string"
+          },
+          "service_name": {
+            "type": "string"
+          },
+          "state": {
+            "description": "pending, in_flight, failed, succeeded, dlq, or expired",
+            "type": "string"
+          },
+          "updated_at": {
+            "format": "date-time",
+            "type": "string"
+          }
+        },
+        "required": [
+          "call_id",
+          "state",
+          "service_name",
+          "method_name",
+          "attempts",
+          "created_at",
+          "updated_at"
+        ],
+        "type": "object"
+      },
+      "QueuedRPCCallListResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "items": {
+                "items": {
+                  "$ref": "#/components/schemas/QueuedRPCCallItem"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "items"
+            ],
+            "type": "object"
+          },
+          "meta": {
+            "$ref": "#/components/schemas/PaginationMeta"
+          },
+          "ok": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "meta"
+        ],
+        "type": "object"
+      },
+      "QueuedRPCCallResponse": {
+        "properties": {
+          "data": {
+            "$ref": "#/components/schemas/QueuedRPCCallItem"
+          },
+          "meta": {
+            "nullable": true
+          },
+          "ok": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
+          "data",
+          "meta"
+        ],
+        "type": "object"
+      },
+      "ReflectDeviceRPCSchemaResponse": {
+        "properties": {
+          "data": {
+            "properties": {
+              "descriptor_digest": {
+                "type": "string"
+              },
+              "descriptor_id": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "descriptor_new": {
+                "type": "boolean"
+              },
+              "methods_synced": {
+                "type": "integer"
+              },
+              "proto_files": {
+                "items": {
+                  "$ref": "#/components/schemas/DeviceRPCProtoFileDef"
+                },
+                "type": "array"
+              },
+              "schema_bound": {
+                "type": "boolean"
+              },
+              "services": {
+                "items": {
+                  "$ref": "#/components/schemas/DeviceRPCServiceDef"
+                },
+                "type": "array"
+              }
+            },
+            "required": [
+              "descriptor_id",
+              "descriptor_digest",
+              "descriptor_new",
+              "schema_bound",
+              "methods_synced",
+              "services",
+              "proto_files"
+            ],
+            "type": "object"
+          },
+          "ok": {
+            "enum": [
+              1
+            ],
+            "type": "integer"
+          }
+        },
+        "required": [
+          "ok",
           "data"
         ],
         "type": "object"
@@ -13526,6 +14040,196 @@
         ]
       }
     },
+    "/projects/{project_id}/devices/{device_id}/enqueue/{service}/{method}": {
+      "post": {
+        "description": "Served by the standalone device RPC proxy listener on `:8082`, outside the Fiber `/core/api/v1` router.\nThe proxy validates `ORG-ID`, bearer auth, device scope, and invoke permission before enqueueing the call\nthrough the domain worker RPC path.\n\nProduction base: `https://rpc.ilyama.golain.io` (no `/core/api/v1` prefix). Delivery is at-least-once.\n",
+        "operationId": "enqueueStandaloneDeviceRPCProxy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Fully qualified protobuf service name.",
+            "example": "golain.device.v1.EchoService",
+            "in": "path",
+            "name": "service",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Unary protobuf RPC method name.",
+            "example": "Echo",
+            "in": "path",
+            "name": "method",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "How long the platform keeps trying (default 900; clamped 60–86400).",
+            "in": "query",
+            "name": "ttl_seconds",
+            "required": false,
+            "schema": {
+              "default": 900,
+              "minimum": 0,
+              "type": "integer"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/DeviceRPCSessionId"
+          },
+          {
+            "$ref": "#/components/parameters/ConnectProtocolVersion"
+          },
+          {
+            "$ref": "#/components/parameters/IdempotencyKey"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "additionalProperties": true,
+                "type": "object"
+              }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "properties": {
+                    "call_id": {
+                      "type": "string"
+                    },
+                    "expires_at": {
+                      "format": "date-time",
+                      "type": "string"
+                    },
+                    "ok": {
+                      "type": "boolean"
+                    },
+                    "state": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "ok",
+                    "call_id",
+                    "state",
+                    "expires_at"
+                  ],
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Device RPC call enqueued."
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid scope, TTL, body, or request."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized."
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Device not found."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request body too large."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Per-org/device enqueue rate limit exceeded."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "servers": [
+          {
+            "description": "Production RPC host",
+            "url": "https://rpc.ilyama.golain.io"
+          },
+          {
+            "description": "Local RPC proxy",
+            "url": "http://localhost:8082"
+          }
+        ],
+        "summary": "Enqueue an asynchronous device RPC through the standalone proxy",
+        "tags": [
+          "Device RPC"
+        ]
+      }
+    },
     "/projects/{project_id}/devices/{device_id}/events": {
       "get": {
         "operationId": "getProjectsProjectIdDevicesDeviceIdEvents",
@@ -13678,15 +14382,17 @@
         ]
       }
     },
-    "/projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}": {
+    "/projects/{project_id}/devices/{device_id}/rpc/queued": {
       "get": {
-        "operationId": "getProjectsProjectIdDevicesDeviceIdRpcQueuedCallId",
+        "description": "Requires device permission can_read_rpc (implied by can_invoke_rpc).",
+        "operationId": "listQueuedRPCCalls",
         "parameters": [
           {
             "in": "path",
             "name": "project_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -13695,14 +14401,76 @@
             "name": "device_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
           {
-            "in": "path",
-            "name": "call_id",
-            "required": true,
+            "in": "query",
+            "name": "page",
             "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 10,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Comma-separated call UUIDs",
+            "in": "query",
+            "name": "ids",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact match on call state (pending, in_flight, failed, succeeded, dlq, expired)",
+            "in": "query",
+            "name": "state",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact match on RPC service name",
+            "in": "query",
+            "name": "service_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact match on RPC method name",
+            "in": "query",
+            "name": "method_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "RFC3339 lower bound on created_at (inclusive)",
+            "in": "query",
+            "name": "created_after",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "RFC3339 upper bound on created_at (inclusive)",
+            "in": "query",
+            "name": "created_before",
+            "schema": {
+              "format": "date-time",
               "type": "string"
             }
           }
@@ -13712,12 +14480,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object"
+                  "$ref": "#/components/schemas/QueuedRPCCallListResponse"
                 }
               }
             },
-            "description": "Successful response"
+            "description": "Queued calls listed"
           },
           "400": {
             "content": {
@@ -13727,7 +14494,7 @@
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Invalid filter"
           },
           "401": {
             "content": {
@@ -13748,6 +14515,16 @@
               }
             },
             "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Device not found"
           }
         },
         "security": [
@@ -13756,21 +14533,23 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}",
+        "summary": "List asynchronous queued RPC calls for a device",
         "tags": [
-          "Devices"
+          "Device RPC"
         ]
       }
     },
-    "/projects/{project_id}/devices/{device_id}/rpc/reflect": {
-      "post": {
-        "operationId": "postProjectsProjectIdDevicesDeviceIdRpcReflect",
+    "/projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}": {
+      "get": {
+        "description": "Requires device permission can_read_rpc (implied by can_invoke_rpc).",
+        "operationId": "getQueuedRPCCall",
         "parameters": [
           {
             "in": "path",
             "name": "project_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
@@ -13779,8 +14558,426 @@
             "name": "device_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
+          },
+          {
+            "in": "path",
+            "name": "call_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/QueuedRPCCallResponse"
+                }
+              }
+            },
+            "description": "Queued call loaded"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Queued call not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Get an asynchronous queued RPC call status",
+        "tags": [
+          "Device RPC"
+        ]
+      }
+    },
+    "/projects/{project_id}/devices/{device_id}/rpc/reflect": {
+      "post": {
+        "description": "Fetches the device's gRPC FileDescriptorSet over MQTT, registers it in the project\ndescriptor registry, and best-effort provisions the per-project RPC invocation trace table.\n",
+        "operationId": "reflectDeviceRPCSchema",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReflectDeviceRPCSchemaResponse"
+                }
+              }
+            },
+            "description": "Descriptor reflected"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Device not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Reflect device gRPC descriptor and bind project schema",
+        "tags": [
+          "Device RPC"
+        ]
+      }
+    },
+    "/projects/{project_id}/devices/{device_id}/rpc/services": {
+      "get": {
+        "description": "Requires device permission can_read_rpc (implied by can_invoke_rpc).",
+        "operationId": "getDeviceRPCServices",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRPCServicesResponse"
+                }
+              }
+            },
+            "description": "Device RPC services loaded"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Device not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "List reflected gRPC services for a device",
+        "tags": [
+          "Device RPC"
+        ]
+      }
+    },
+    "/projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations": {
+      "get": {
+        "description": "Requires device permission can_read_rpc (implied by can_invoke_rpc).",
+        "operationId": "listProjectDeviceRPCInvocations",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "session_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "page",
+            "schema": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "in": "query",
+            "name": "limit",
+            "schema": {
+              "default": 10,
+              "maximum": 100,
+              "minimum": 1,
+              "type": "integer"
+            }
+          },
+          {
+            "description": "Exact match on RPC service name",
+            "in": "query",
+            "name": "service_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Exact match on RPC method name",
+            "in": "query",
+            "name": "method_name",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "RFC3339 lower bound on invocation time (inclusive)",
+            "in": "query",
+            "name": "created_after",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          },
+          {
+            "description": "RFC3339 upper bound on invocation time (inclusive)",
+            "in": "query",
+            "name": "created_before",
+            "schema": {
+              "format": "date-time",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/DeviceRPCInvocationsResponse"
+                }
+              }
+            },
+            "description": "Invocation traces loaded"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Device not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "List RPC invocation traces for a device session",
+        "tags": [
+          "Device RPC"
+        ]
+      }
+    },
+    "/projects/{project_id}/devices/{device_id}/streams/{service}/{method}": {
+      "post": {
+        "description": "Served by the standalone device RPC proxy listener on `:8082`, outside the Fiber `/core/api/v1` router.\nReturns `text/event-stream` with connected, message (base64 gRPC frames), end, error, cancelled, and ping events.\n\nProduction base: `https://rpc.ilyama.golain.io` (no `/core/api/v1` prefix). Device must be online.\n",
+        "operationId": "streamStandaloneDeviceRPCProxy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "example": "golain.device.v1.EchoService",
+            "in": "path",
+            "name": "service",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "example": "EchoServerStream",
+            "in": "path",
+            "name": "method",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/DeviceRPCSessionId"
+          },
+          {
+            "$ref": "#/components/parameters/DeviceRPCStreamAccept"
           }
         ],
         "requestBody": {
@@ -13790,15 +14987,134 @@
                 "additionalProperties": true,
                 "type": "object"
               }
+            }
+          },
+          "required": false
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "text/event-stream": {
+                "schema": {
+                  "type": "string"
+                }
+              }
             },
-            "multipart/form-data": {
+            "description": "Server-sent events stream."
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Device or method not found."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Per-org/device stream rate limit exceeded."
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "servers": [
+          {
+            "description": "Production RPC host",
+            "url": "https://rpc.ilyama.golain.io"
+          },
+          {
+            "description": "Local RPC proxy",
+            "url": "http://localhost:8082"
+          }
+        ],
+        "summary": "Open a server-streaming device RPC through the standalone proxy (SSE)",
+        "tags": [
+          "Device RPC"
+        ]
+      }
+    },
+    "/projects/{project_id}/devices/{device_id}/{service}/{method}": {
+      "post": {
+        "description": "Served by the standalone device RPC proxy listener on `:8082`, outside the Fiber `/core/api/v1` router.\nThe proxy validates `ORG-ID`, bearer auth, device scope, and invoke permission before transcoding JSON to the\ndevice's reflected gRPC schema and relaying the call through mqtt-broker.\n\nProduction base: `https://rpc.ilyama.golain.io` (no `/core/api/v1` prefix).\n",
+        "operationId": "invokeStandaloneDeviceRPCProxy",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "device_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "description": "Fully qualified protobuf service name.",
+            "example": "golain.device.v1.EchoService",
+            "in": "path",
+            "name": "service",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "description": "Unary protobuf RPC method name.",
+            "example": "Echo",
+            "in": "path",
+            "name": "method",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "$ref": "#/components/parameters/DeviceRPCSessionId"
+          },
+          {
+            "$ref": "#/components/parameters/ConnectProtocolVersion"
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
               "schema": {
                 "additionalProperties": true,
                 "type": "object"
               }
             }
           },
-          "required": true
+          "required": false
         },
         "responses": {
           "200": {
@@ -13810,7 +15126,7 @@
                 }
               }
             },
-            "description": "Successful response"
+            "description": "Device RPC response transcoded from protobuf to JSON."
           },
           "400": {
             "content": {
@@ -13820,7 +15136,7 @@
                 }
               }
             },
-            "description": "Bad request"
+            "description": "Invalid scope, body, or request."
           },
           "401": {
             "content": {
@@ -13830,7 +15146,7 @@
                 }
               }
             },
-            "description": "Unauthorized"
+            "description": "Unauthorized."
           },
           "403": {
             "content": {
@@ -13840,7 +15156,37 @@
                 }
               }
             },
-            "description": "Forbidden"
+            "description": "Forbidden."
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Device, descriptor, service, or method not found."
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request body too large."
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Per-org/device invoke rate limit exceeded."
           }
         },
         "security": [
@@ -13849,169 +15195,19 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "POST /projects/{project_id}/devices/{device_id}/rpc/reflect",
+        "servers": [
+          {
+            "description": "Production RPC host",
+            "url": "https://rpc.ilyama.golain.io"
+          },
+          {
+            "description": "Local RPC proxy",
+            "url": "http://localhost:8082"
+          }
+        ],
+        "summary": "Invoke a unary device RPC through the standalone proxy",
         "tags": [
-          "Devices"
-        ]
-      }
-    },
-    "/projects/{project_id}/devices/{device_id}/rpc/services": {
-      "get": {
-        "operationId": "getProjectsProjectIdDevicesDeviceIdRpcServices",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "project_id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "device_id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful response"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Bad request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": [],
-            "orgIdHeader": []
-          }
-        ],
-        "summary": "GET /projects/{project_id}/devices/{device_id}/rpc/services",
-        "tags": [
-          "Devices"
-        ]
-      }
-    },
-    "/projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations": {
-      "get": {
-        "operationId": "getProjectsProjectIdDevicesDeviceIdRpcSessionsSessionIdInvocations",
-        "parameters": [
-          {
-            "in": "path",
-            "name": "project_id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "device_id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          },
-          {
-            "in": "path",
-            "name": "session_id",
-            "required": true,
-            "schema": {
-              "type": "string"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "additionalProperties": true,
-                  "type": "object"
-                }
-              }
-            },
-            "description": "Successful response"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Bad request"
-          },
-          "401": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Unauthorized"
-          },
-          "403": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Forbidden"
-          }
-        },
-        "security": [
-          {
-            "bearerAuth": [],
-            "orgIdHeader": []
-          }
-        ],
-        "summary": "GET /projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations",
-        "tags": [
-          "Devices"
+          "Device RPC"
         ]
       }
     },
@@ -17398,7 +18594,167 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "List project features",
+        "summary": "List user-enabled project features with effective values",
+        "tags": [
+          "Project settings"
+        ]
+      }
+    },
+    "/projects/{project_id}/features/{key}": {
+      "get": {
+        "operationId": "getProjectFeature",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectFeatureItemResponse"
+                }
+              }
+            },
+            "description": "Feature loaded"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Feature not found"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Get one user-enabled project feature",
+        "tags": [
+          "Project settings"
+        ]
+      },
+      "put": {
+        "operationId": "updateProjectFeature",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "project_id",
+            "required": true,
+            "schema": {
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ProjectFeatureUpdateRequest"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ProjectFeatureUpdateResponse"
+                }
+              }
+            },
+            "description": "Feature updated"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Invalid request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          }
+        },
+        "security": [
+          {
+            "bearerAuth": [],
+            "orgIdHeader": []
+          }
+        ],
+        "summary": "Set a user-enabled project feature value",
         "tags": [
           "Project settings"
         ]
@@ -28697,23 +30053,25 @@
         ]
       }
     },
-    "/projects/{project_id}/rpc/descriptors/{digest}": {
+    "/projects/{project_id}/rpc/descriptors/{descriptor_id}": {
       "get": {
-        "operationId": "getProjectsProjectIdRpcDescriptorsDigest",
+        "operationId": "getProjectRPCDescriptor",
         "parameters": [
           {
             "in": "path",
             "name": "project_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           },
           {
             "in": "path",
-            "name": "digest",
+            "name": "descriptor_id",
             "required": true,
             "schema": {
+              "format": "uuid",
               "type": "string"
             }
           }
@@ -28723,22 +30081,11 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "type": "object"
+                  "$ref": "#/components/schemas/ProjectRPCDescriptorResponse"
                 }
               }
             },
-            "description": "Successful response"
-          },
-          "400": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/ErrorEnvelope"
-                }
-              }
-            },
-            "description": "Bad request"
+            "description": "Descriptor loaded"
           },
           "401": {
             "content": {
@@ -28759,6 +30106,16 @@
               }
             },
             "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Descriptor not found"
           }
         },
         "security": [
@@ -28767,7 +30124,7 @@
             "orgIdHeader": []
           }
         ],
-        "summary": "GET /projects/{project_id}/rpc/descriptors/{digest}",
+        "summary": "Fetch a project RPC descriptor by ID",
         "tags": [
           "Device RPC"
         ]
@@ -32391,6 +33748,15 @@
   ],
   "servers": [
     {
+      "description": "Production",
+      "url": "https://api.ilyama.golain.io/core/api/v1"
+    },
+    {
+      "description": "Local vm-edge",
+      "url": "http://localhost:19090/core/api/v1"
+    },
+    {
+      "description": "Relative (same host)",
       "url": "/core/api/v1"
     }
   ],

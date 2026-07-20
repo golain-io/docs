@@ -1,0 +1,190 @@
+---
+title: API quickstart
+description: Base URL, auth headers, permissions, and an end-to-end curl walkthrough for the assets and maintenance API.
+---
+
+Everything under **Assets & maintenance** — asset registry, counters, maintenance plans, work orders, materials, schedules, and alarms — is a normal resource on the Golain Platform API. This page gets you from zero to your first authenticated request.
+
+## Base URL
+
+| Environment | Base URL |
+|-------------|----------|
+| Production | `https://api.ilyama.golain.io/core/api/v1` |
+| Self-hosted | `https://api.<your-domain>/core/api/v1` |
+
+All paths below are relative to this base. See [API introduction](/api-reference/introduction) for the full endpoint list.
+
+## Headers
+
+| Header | Required | Description |
+|--------|----------|--------------|
+| `Authorization` | Yes | `Bearer <access_token>` — see [Authentication](/api-reference/authentication) for how to obtain one |
+| `ORG-ID` | Yes | UUID of the active organization |
+| `Idempotency-Key` | Mutations | Unique key per logical write, so a retried request doesn't create a duplicate |
+
+## Environment bootstrap
+
+```bash
+export API=https://api.ilyama.golain.io/core/api/v1
+export TOKEN=<your-oidc-access-token>
+export ORG_ID=<your-org-uuid>
+export PROJECT_ID=<your-project-uuid>
+```
+
+## Permissions
+
+| Operation | What you need |
+|-----------|-----------------|
+| Creating, updating, deleting, or otherwise mutating an asset, asset type, counter, maintenance plan, material, schedule, or alarm definition | The project's **`can_manage_assets`** permission |
+| Reading any of the above | Standard project read access — enforced per-row, so lists only return what you can see |
+| Work order parts and failure reports | Standard project membership |
+
+The API returns `403` when a permission check fails.
+
+## Idempotency
+
+Send an `Idempotency-Key` header on every `POST`, `PATCH`, and `DELETE`. If a request times out or you retry after a network error, reusing the same key lets the platform recognize the retry instead of creating a second asset, work order, or movement. Use a fresh key (for example `uuidgen`) per logical write.
+
+## Resource map
+
+| Resource | Path prefix |
+|----------|-------------|
+| Assets | `/projects/{project_id}/assets` |
+| Asset types | `/projects/{project_id}/asset-types` |
+| Counter definitions | `/projects/{project_id}/counter-defs` |
+| Counter readings, reset, reconcile | `/projects/{project_id}/assets/{asset_id}/counters` |
+| Maintenance plans | `/projects/{project_id}/maintenance-plans` |
+| Work order parts | `/projects/{project_id}/work-orders/{ticket_id}/parts` |
+| Work order failure report | `/projects/{project_id}/work-orders/{ticket_id}/failure-report` |
+| Materials | `/projects/{project_id}/materials` |
+| Warehouses, storage locations, bins | `/projects/{project_id}/warehouses`, `/storage-locations`, `/bins` |
+| Stock | `/projects/{project_id}/stock` |
+| Inventory movements | `/projects/{project_id}/movements` |
+| Reservations | `/projects/{project_id}/reservations` |
+| Procurement (requisitions, orders, receipts) | `/projects/{project_id}/purchase-requisitions`, `/purchase-orders`, `/goods-receipts` |
+| Schedules | `/projects/{project_id}/schedules` |
+| Alarm definitions | `/projects/{project_id}/alarm-definitions` |
+| Alarm instances | `/projects/{project_id}/alarm-instances` |
+
+<Note>
+  Work orders themselves are project tickets — parts and failure reports layer onto an existing ticket ID. See [Maintenance](/assets/maintenance) for the work order lifecycle.
+</Note>
+
+## Happy path: register an asset and start tracking it
+
+This sequence creates an asset type, an asset under it, a counter to track on that asset, and a recurring schedule — the minimum to go from nothing to a monitored asset.
+
+### 1. Create an asset type
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{
+    "key": "centrifugal-pump",
+    "name": "Centrifugal pump",
+    "equipment_class": "rotating"
+  }' \
+  "$API/projects/$PROJECT_ID/asset-types"
+```
+
+Capture `data.item.id` from the response as `ASSET_TYPE_ID`.
+
+### 2. Create an asset
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{
+    "asset_type_id": "'"$ASSET_TYPE_ID"'",
+    "tag": "PUMP-101",
+    "name": "Pump 101"
+  }' \
+  "$API/projects/$PROJECT_ID/assets"
+```
+
+Capture `data.item.id` as `ASSET_ID`.
+
+### 3. Create a counter definition
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{
+    "key": "running-hours",
+    "name": "Running hours",
+    "unit": "hours",
+    "kind": "cumulative",
+    "scope_asset_type_id": "'"$ASSET_TYPE_ID"'"
+  }' \
+  "$API/projects/$PROJECT_ID/counter-defs"
+```
+
+Capture `data.item.id` as `COUNTER_DEF_ID`. Scoping to the asset type means every asset of that type gets the counter automatically — see [Counters](/assets/counters).
+
+### 4. Post a counter reading
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{
+    "counter_def_id": "'"$COUNTER_DEF_ID"'",
+    "value": 128.5
+  }' \
+  "$API/projects/$PROJECT_ID/assets/$ASSET_ID/counters/reading"
+```
+
+### 5. (Optional) Create a recurring schedule
+
+```bash
+curl -sS -X POST \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -H "Idempotency-Key: $(uuidgen)" \
+  -d '{
+    "key": "pump-101-monthly-pm",
+    "name": "Pump 101 monthly PM",
+    "rrule": "FREQ=MONTHLY;BYMONTHDAY=1",
+    "dtstart": "2026-08-01T08:00:00Z",
+    "owner_domain": "cmms"
+  }' \
+  "$API/projects/$PROJECT_ID/schedules"
+```
+
+See [Scheduler](/assets/scheduler) for how schedules drive maintenance plans, and [Maintenance](/assets/maintenance) for turning a due schedule into a work order.
+
+## Full endpoint reference
+
+This page covers the shape of the API, not every field on every endpoint. Browse the interactive reference for request/response schemas, or jump straight to a concept page for the resources you're working with.
+
+<CardGroup cols={2}>
+  <Card title="API reference" icon="code" href="/api-reference/introduction">
+    Full OpenAPI-generated reference with every operation, field, and example.
+  </Card>
+  <Card title="Authentication" icon="key" href="/api-reference/authentication">
+    How to obtain and use a bearer token.
+  </Card>
+</CardGroup>
+
+## Related
+
+- [Overview](/assets/overview) — how assets, counters, and maintenance fit together
+- [Asset tree](/assets/asset-tree) — hierarchy and linking
+- [Counters](/assets/counters) — readings, resets, and reconciliation
+- [Maintenance](/assets/maintenance) — maintenance plans and work orders
+- [Materials](/assets/materials) — stock, movements, and procurement
+- [Alarms](/assets/alarms) — alarm definitions, instances, and auto work orders
+- [Scheduler](/assets/scheduler) — recurring schedules
+- [KPIs and reporting](/assets/kpis-and-reporting) — dashboards built on this data

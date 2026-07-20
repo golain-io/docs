@@ -15,7 +15,7 @@ Edge sync governance routes live under `/projects/{project_id}/edge/*` and are s
 | Self-hosted | `https://api.<your-domain>/core/api/v1` |
 | Local vm-edge | `http://localhost:19090/core/api/v1` |
 
-Paths in this reference are relative to `/core/api/v1`. Endpoints are grouped by resource (Organizations, Projects, Devices, Edge replication, Integrations, OTA, and more) in the sidebar — all **351** operations from the mounted ilyama route surface are included.
+Paths in this reference are relative to `/core/api/v1`, except **Device RPC proxy** routes (unary invoke, SSE stream, enqueue) which use `https://rpc.ilyama.golain.io` with no `/core/api/v1` prefix. Endpoints are grouped by resource (Organizations, Projects, Devices, Device RPC, Edge replication, Integrations, OTA, and more) in the sidebar.
 
 ## OpenAPI specification
 
@@ -34,6 +34,9 @@ cp openapi/ilyama.v1.json ../../docs/api-reference/ilyama.v1.json
 <CardGroup cols={2}>
   <Card title="Authentication" icon="key" href="/api-reference/authentication">
     Bearer token, ORG-ID header, idempotency keys.
+  </Card>
+  <Card title="Device RPC" icon="bolt" href="/edge/device-rpc/api-reference">
+    Invoke, stream, enqueue, and management playground.
   </Card>
   <Card title="Edge sync API" icon="database" href="/edge/data-sync/api-reference">
     Operator-focused summary of `/edge/*` routes.
