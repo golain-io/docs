@@ -45,16 +45,16 @@ If the device disconnects and reconnects, Golain refreshes the binding. When the
 
 ### Unary (sync invoke)
 
-1. Your app sends an HTTP POST with a JSON body to the **RPC host** (`https://rpc.ilyama.golain.io`) — `/{Service}/{Method}` in the URL, no `/core/api/v1` prefix.
-2. Golain checks your token, organization, and `can_invoke_rpc` permission on the device.
+1. Your app sends an HTTP POST with a JSON body to the **RPC host** (`https://rpc.ilyama.golain.io`) — `/{Service}/{Method}` in the URL, no `/core/api/v1` prefix. The proxy accepts Connect JSON (`application/json`), Connect binary (`application/proto`), or raw wire (`application/x-protobuf`) — see [Content-Type matrix](/edge/device-rpc/invoking-methods#content-type-matrix).
+2. Golain checks your token, organization, and the matching device permission (`can_invoke_rpc` for invoke/enqueue/stream; `can_read_rpc` for management reads).
 3. Golain delivers the call to the device and waits for the handler to finish.
-4. Golain converts the response to JSON and returns it to your app.
+4. Golain returns Connect JSON (default), Connect binary, or wire bytes depending on how you called.
 
 Optional `?session_id=` on the invoke URL groups calls for later audit queries. See [Invoking methods](/edge/device-rpc/invoking-methods) for headers, URL shape, and examples.
 
 ### Server-stream (SSE)
 
-1. Your app POSTs to the **RPC host** with `/streams/{Service}/{Method}` in the URL and `Accept: text/event-stream`.
+1. Your app POSTs to the **RPC host** with `/streams/{Service}/{Method}` in the URL and `Accept: text/event-stream`. Send JSON (`application/json`, transcoded to wire) or naked protobuf wire (`application/proto` / `application/x-protobuf`).
 2. Golain checks auth and permissions the same way as unary invoke.
 3. Golain opens a server-streaming call to the device and relays each response message as an SSE `message` event (base64 protobuf).
 4. The stream ends with an `end` event, or `error` / `cancelled` on failure.
@@ -69,8 +69,8 @@ Use `curl -N` so the client does not buffer events. See [Stream a method (SSE)](
 
 | Method type | Cloud path | Notes |
 |-------------|------------|-------|
-| **Unary** | `POST https://rpc.ilyama.golain.io/.../{Service}/{Method}` | Connect JSON request and response |
-| **Server stream** | `POST https://rpc.ilyama.golain.io/.../streams/{Service}/{Method}` | SSE (`text/event-stream`) |
+| **Unary** | `POST https://rpc.ilyama.golain.io/.../{Service}/{Method}` | JSON, Connect binary, or raw wire — see [Content-Type matrix](/edge/device-rpc/api-reference#content-type-matrix) |
+| **Server stream** | `POST https://rpc.ilyama.golain.io/.../streams/{Service}/{Method}` | SSE (`text/event-stream`); JSON or naked wire request |
 | **Client stream** | — | Device only — sync path returns **501** `streaming rpc not supported` |
 | **Bidi stream** | — | Device only — sync path returns **501** `streaming rpc not supported` |
 

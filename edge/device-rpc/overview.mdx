@@ -59,7 +59,7 @@ Before you invoke methods from the cloud, confirm:
 1. **Device registered** in the Console or via platform-tui — you need the device UUID.
 2. **Omega with `device-rpc`** enabled and deployed on the device — see [Omega setup](/edge/device-rpc/omega-setup).
 3. **Device online** on MQTT so Golain can learn its service schema.
-4. **Caller permission** — your user needs `can_invoke_rpc` on the target device.
+4. **Caller permission** — your user needs `can_invoke_rpc` to call methods (implies `can_read_rpc` for discovery and history).
 
 <Warning>
   Invoke, stream, and enqueue requests go to the **RPC host** (`https://rpc.ilyama.golain.io`) — paths like `/projects/.../devices/...` with no `/core/api/v1` prefix. Management routes (list services, reflect, audit) use `https://api.ilyama.golain.io/core/api/v1/...`.

@@ -14,7 +14,7 @@ For offline-tolerant or retry-friendly workflows, use [Queued invoke](/edge/devi
 ## Before you invoke
 
 1. Device is **online** with `device-rpc` running and schema **bound** — see [Omega setup](/edge/device-rpc/omega-setup).
-2. Your user has **`can_invoke_rpc`** on the target device.
+2. Your user has **`can_invoke_rpc`** on the target device (implies `can_read_rpc` for discovery/history).
 3. You know the **full protobuf service name** and **method name** — discover them via the services API below.
 
 ## Discover available methods
@@ -81,10 +81,27 @@ POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/{Ser
 |--------|-------|
 | `Authorization` | `Bearer {oidc_access_token}` |
 | `ORG-ID` | Organization UUID |
-| `Content-Type` | `application/json` |
-| `Connect-Protocol-Version` | `1` |
+| `Content-Type` | See [Content-Type matrix](#content-type-matrix) below — `application/json` for curl and scripts |
 
 Same authentication as the Console and `/core/api/v1` — see [Platform concepts — Authentication](/getting-started/concepts#authentication).
+
+`Connect-Protocol-Version: 1` is **optional** for Connect JSON (`application/json` or empty `Content-Type`). The proxy injects it when absent.
+
+## Content-Type matrix
+
+The proxy transcodes request bodies based on `Content-Type`. Response shape follows the request encoding on unary sync invoke.
+
+### Unary sync invoke (`POST .../{Service}/{Method}`)
+
+| `Content-Type` | Request body | Response |
+|----------------|--------------|----------|
+| `application/json` or empty | Connect JSON object matching the protobuf **request** message | Connect JSON matching the **response** message |
+| `application/proto` | Connect binary framing (generated Connect clients) | Connect binary via Vanguard |
+| `application/x-protobuf` | Raw gRPC/protobuf wire bytes (no Connect envelope) | `application/proto` wire bytes (fast path, no Vanguard) |
+
+<Note>
+  For curl and scripts, use **`application/json`** with a JSON object — you do not need `Connect-Protocol-Version`. Generated Connect or gRPC clients can send `application/proto` or `application/x-protobuf` instead.
+</Note>
 
 ## Example: Echo unary call
 
@@ -97,7 +114,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -d '{"message":"hello from cloud"}'
 ```
 
@@ -126,10 +142,21 @@ POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/stre
 |--------|-------|
 | `Authorization` | `Bearer {oidc_access_token}` |
 | `ORG-ID` | Organization UUID |
-| `Content-Type` | `application/json` |
+| `Content-Type` | `application/json` (default for curl) — see stream matrix below |
 | `Accept` | `text/event-stream` |
 
 Use **`curl -N`** (no buffer) so events print as they arrive. Optional `?session_id=` works the same as unary invoke.
+
+### Stream request `Content-Type`
+
+| `Content-Type` | Request body |
+|----------------|--------------|
+| `application/json` or empty | JSON object — proxy transcodes to protobuf wire before relaying to the device |
+| `application/proto` or `application/x-protobuf` | Naked protobuf wire bytes — passed through as-is |
+
+On `/streams/`, `application/proto` means **naked wire** (unlike unary, where it means Connect binary framing). Other Content-Types return **415**.
+
+Response is always **SSE** with base64 protobuf frames in `message` events (unchanged).
 
 ### Example: EchoServerStream
 
@@ -166,12 +193,13 @@ Decode each `message` event's data with your protobuf response type after base64
 |--------|------------|
 | Invoke method (RPC host) | `can_invoke_rpc` on device |
 | Stream method (`/streams/...` on RPC host) | `can_invoke_rpc` on device |
-| List services | `can_invoke_rpc` on device |
-| Poll queued call status | `can_invoke_rpc` on device |
-| Query invocation history | `can_invoke_rpc` on device |
+| Enqueue method (RPC host) | `can_invoke_rpc` on device |
+| List services | `can_read_rpc` on device |
+| Poll / list queued calls | `can_read_rpc` on device |
+| Query invocation history | `can_read_rpc` on device |
 | Force schema reflect | `can_write_device_metadata` on device |
 
-Missing permission returns `403 forbidden`.
+`can_invoke_rpc` implies `can_read_rpc`. Missing permission returns `403 forbidden`.
 
 ## Audit invocation history
 
@@ -183,10 +211,51 @@ export API=https://api.ilyama.golain.io
 curl -sS \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
-  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?page=1&limit=50"
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?page=1&limit=10"
 ```
 
-Each row includes `service_name`, `method_name`, `grpc_status_code`, `latency_ms`, and payload digests — not raw request/response bodies.
+**Optional filters** (AND together; omit = no constraint):
+
+| Param | Description |
+|-------|-------------|
+| `page`, `limit` | Offset pagination (default `page=1`, `limit=10`, max **100**) |
+| `service_name`, `method_name` | Exact match |
+| `created_after`, `created_before` | RFC3339 bounds on the invocation `time` column |
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?service_name=golain.device.v1.EchoService&method_name=Echo&created_after=2026-07-01T00:00:00Z"
+```
+
+Response shape: `data.items[]` plus pagination `meta` (`current_page`, `items_per_page`, `total_items`, `total_pages`).
+
+By default, audit is **metadata-only** — each row includes `service_name`, `method_name`, `grpc_status_code`, `latency_ms`, and `trace_id`. Request and response bodies are not stored or returned unless payload capture is enabled for the project.
+
+### Enable payload capture (optional)
+
+To store and return full bodies, enable the project feature (requires **`PROJECT_ADMIN`**):
+
+```bash
+curl -sS -X PUT \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  -H "Content-Type: application/json" \
+  -d '{"value":"true"}' \
+  "$API/core/api/v1/projects/$PROJECT_ID/features/feature.rpc.payload_capture.enabled"
+```
+
+Set `"value": "false"` to disable. Only registry keys with **`user_enabled: true`** are writable via the project features API — operator-controlled keys are not exposed here.
+
+When enabled, bodies are captured at invoke time (capped at **64 KiB** each) and returned on the invocations query:
+
+| Field | Shape |
+|-------|-------|
+| `req_payload` | JSON object for Connect JSON requests; base64 string for protobuf wire |
+| `resp_payload` | JSON object for Connect JSON responses; base64 string for protobuf wire |
+
+Omitted when capture was disabled at invoke time or the body was empty.
 
 ## Local development
 
@@ -208,7 +277,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -d '{"message":"ping"}'
 
 # Server stream
@@ -253,7 +321,7 @@ Use the sync path for unary methods and `/streams/` for `server_stream` methods 
 | HTTP status | Message | Meaning |
 |-------------|---------|---------|
 | 401 | `unauthorized` | Missing or invalid bearer token |
-| 403 | `forbidden` | Missing `can_invoke_rpc` |
+| 403 | `forbidden` | Missing `can_invoke_rpc` (invoke) or `can_read_rpc` (reads) |
 | 404 | `device descriptor not found` | Schema not bound — see [Troubleshooting](/edge/device-rpc/troubleshooting) |
 | 404 | `service not found in descriptor` | Wrong service name in URL |
 | 404 | `method not found in descriptor` | Wrong method name |
@@ -263,7 +331,7 @@ Use the sync path for unary methods and `/streams/` for `server_stream` methods 
 → [Troubleshooting](/edge/device-rpc/troubleshooting)
 
 <Note>
-  **Connect JSON** (`Content-Type: application/json`, `Connect-Protocol-Version: 1`) is the simplest path for unary curl and scripts. The same unary URL also accepts **Connect binary** and **gRPC** via content negotiation if you use generated clients.
+  **Connect JSON** (`Content-Type: application/json`) is the simplest path for unary curl and scripts — `Connect-Protocol-Version` is optional. The same unary URL also accepts **Connect binary** (`application/proto`) and **raw protobuf wire** (`application/x-protobuf`) when using generated clients.
 </Note>
 
 ## Related

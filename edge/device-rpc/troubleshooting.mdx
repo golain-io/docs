@@ -51,6 +51,8 @@ flowchart TD
 | Outdated method list after OTA | Stale schema binding | [Stale schema after OTA](#stale-schema-after-ota) |
 | Queued call stuck or expired | Device offline past TTL | [Queued stuck or duplicates](#queued-stuck-or-duplicates) |
 | Duplicate side effects from queued RPC | Handler not idempotent | [Queued idempotency](#queued-idempotency) |
+| `invalid json request body` (400) on stream | Wrong `Content-Type` or malformed JSON for stream open | [Content-Type and transcoding](#content-type-and-transcoding) |
+| `unsupported content type` (415) on stream | Unsupported `Content-Type` on `/streams/` (not JSON / `application/proto` / `application/x-protobuf`) | [Content-Type and transcoding](#content-type-and-transcoding) |
 | Schema never appears after device connects | Self-hosted stack misconfiguration | [Self-hosted operators](#self-hosted-operators) |
 
 ---
@@ -116,7 +118,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -d '{"message":"diagnostic ping"}'
 ```
 
@@ -165,7 +166,7 @@ Update Omega client YAML or `OMEGA_ROOT_TOPIC`, redeploy, and verify list servic
 
 **Fix:**
 
-Grant **`can_invoke_rpc`** on the target device for your user or permission group. Reflect additionally requires **`can_write_device_metadata`**.
+Grant **`can_invoke_rpc`** to call methods (implies **`can_read_rpc`** for listing services, queued polls, and invocation history). Grant **`can_read_rpc`** alone for read-only access. Reflect additionally requires **`can_write_device_metadata`**.
 
 Update permissions in Console, then retry.
 
@@ -212,7 +213,7 @@ Only **unary** methods use the sync path. **Server-stream** methods use `/stream
 
 | Method type | Correct cloud path |
 |-------------|-------------------|
-| `unary` | `POST $RPC_PROXY/.../{Service}/{Method}` with Connect JSON headers |
+| `unary` | `POST $RPC_PROXY/.../{Service}/{Method}` with `Content-Type: application/json` (or generated client encodings) |
 | `server_stream` | `POST $RPC_PROXY/.../streams/{Service}/{Method}` with `Accept: text/event-stream` and `curl -N` |
 | `client_stream`, `bidi_stream` | Device only — not available from cloud |
 
@@ -229,6 +230,38 @@ curl -N -X POST \
 ```
 
 For client-stream and bidi methods (`EchoClientStream`, `EchoBidiStream`), use device-local tooling — the cloud does not expose these shapes.
+
+---
+
+## Content-Type and transcoding
+
+**Symptoms:**
+
+- HTTP **400** with `"invalid json request body"` when opening a server stream with `Content-Type: application/json`
+- HTTP **415** with `"unsupported content type"` on the `/streams/` path
+- Unary invoke with `application/x-protobuf` returns wire bytes instead of JSON — caller expected Connect JSON
+
+**Cause:**
+
+The RPC proxy transcodes request bodies by path and `Content-Type`. On **`/streams/`**, `application/proto` and `application/x-protobuf` both mean **naked protobuf wire** (passthrough). On **unary** invoke, `application/proto` means **Connect binary framing** (Vanguard) and `application/x-protobuf` is the naked-wire fast path. Other stream Content-Types (for example gRPC-Web) return **415**.
+
+Unary sync invoke returns Connect JSON when you send `application/json` (or empty `Content-Type`). `application/x-protobuf` responds with `application/proto` wire bytes.
+
+**Fix:**
+
+| Goal | Path | `Content-Type` | Body |
+|------|------|----------------|------|
+| Curl unary Echo | `/{Service}/{Method}` | `application/json` | `{"message":"…"}` |
+| Curl server stream | `/streams/{Service}/{Method}` | `application/json` | `{"message":"…"}` |
+| Generated client, raw wire | either path | `application/x-protobuf` | naked protobuf request |
+| Stream with naked `application/proto` | `/streams/{Service}/{Method}` | `application/proto` | naked protobuf request (not Connect-framed) |
+| Generated Connect client (unary) | `/{Service}/{Method}` | `application/proto` | Connect binary framing |
+
+`Connect-Protocol-Version: 1` is optional for JSON unary — the proxy injects it when absent.
+
+Match field names and types to the protobuf request message. A typo or wrong type in JSON fails protojson unmarshaling on the stream path with **400** `invalid json request body`.
+
+→ Full matrix: [Invoking methods — Content-Type matrix](/edge/device-rpc/invoking-methods#content-type-matrix)
 
 ---
 
@@ -292,7 +325,6 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -H "Idempotency-Key: $(uuidgen)" \
   -d '{"message":"retry when online"}'
 ```
@@ -350,11 +382,10 @@ curl -sS -X POST \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   -H "Content-Type: application/json" \
-  -H "Connect-Protocol-Version: 1" \
   -d '{"message":"diagnostic ping"}'
 ```
 
-Local dev: set `API=https://localhost:19090/core/api/v1` and `RPC_PROXY=http://localhost:8082`.
+Local dev: `export API=https://localhost:19090` and `export RPC_PROXY=http://localhost:8082`, then use `$API/core/api/v1/projects/...` for management routes.
 
 ## Still stuck?
 
