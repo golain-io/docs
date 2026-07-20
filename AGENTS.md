@@ -76,8 +76,11 @@ Reload Cursor MCP after changing `~/.cursor/mcp.json`.
 | Omega install/configure | `omega/docs/*.md` |
 | vm-edge | `ilyama/infra/deploy/vm-edge/README.md` |
 | Console features | `pw/README.md` + [Edge Sync](/console/edge-sync) |
+| Device RPC TypeScript callers | `pw/src/lib/rpc.ts` + `pw/src/app/fleet-and-devices/components/device-rpc.tsx` → [TypeScript frontend](/edge/device-rpc/typescript-frontend) |
+| Device RPC OpenAPI playground | `ilyama/services/apis/openapi/ilyama.v1.yaml` (+ `go run ./openapi/cmd/sync`) → copy `ilyama.v1.json` into `docs/api-reference/` |
 | golain-cli | `golain-cli/ReadME.md` |
 | Edge sync protocol | `ilyama/docs/knowledge/edge-client-guide.md` |
+| Assets / CMMS / MM | `ilyama/docs/knowledge/assets.md` + `ilyama/docs/specs/proposals/asset-mm-cmms/SPEC.md` (§§1-4 for asset identity; later sections cover counters, CMMS, materials, alarms, scheduler — rewrite for end users, never copy worker/outbox/sqlc internals) |
 
 When upstream changes, update the corresponding Mintlify page and cross-links.
 

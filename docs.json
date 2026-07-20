@@ -63,6 +63,20 @@
               "console/integrations",
               "console/settings"
             ]
+          },
+          {
+            "group": "Assets & maintenance",
+            "pages": [
+              "assets/overview",
+              "assets/asset-tree",
+              "assets/counters",
+              "assets/maintenance",
+              "assets/materials",
+              "assets/alarms",
+              "assets/scheduler",
+              "assets/kpis-and-reporting",
+              "assets/api-quickstart"
+            ]
           }
         ]
       },
@@ -108,13 +122,24 @@
           },
           {
             "group": "Device RPC",
+            "openapi": "api-reference/ilyama.v1.json",
             "pages": [
               "edge/device-rpc/overview",
               "edge/device-rpc/how-it-works",
               "edge/device-rpc/omega-setup",
               "edge/device-rpc/invoking-methods",
               "edge/device-rpc/queued-invoke",
+              "edge/device-rpc/typescript-frontend",
               "edge/device-rpc/api-reference",
+              "GET /projects/{project_id}/devices/{device_id}/rpc/services",
+              "POST /projects/{project_id}/devices/{device_id}/rpc/reflect",
+              "GET /projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations",
+              "GET /projects/{project_id}/devices/{device_id}/rpc/queued",
+              "GET /projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}",
+              "GET /projects/{project_id}/rpc/descriptors/{descriptor_id}",
+              "POST /projects/{project_id}/devices/{device_id}/{service}/{method}",
+              "POST /projects/{project_id}/devices/{device_id}/streams/{service}/{method}",
+              "POST /projects/{project_id}/devices/{device_id}/enqueue/{service}/{method}",
               "edge/device-rpc/troubleshooting"
             ]
           },

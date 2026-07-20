@@ -1,0 +1,531 @@
+---
+title: TypeScript frontend integration
+description: Call Device RPC from a browser or Node TypeScript app — unary invoke, SSE streams, and queued delivery with fetch.
+---
+
+Build your own TypeScript UI or integration against Device RPC using the platform HTTP APIs. This page uses the browser/`fetch` APIs — no Golain SDK required. The Golain Console uses the same shapes.
+
+For curl walkthroughs, see [Invoking methods](/edge/device-rpc/invoking-methods) and [Queued invoke](/edge/device-rpc/queued-invoke). For every route, see [API reference](/edge/device-rpc/api-reference).
+
+## Two hosts
+
+| Surface | Base URL | Used for |
+|---------|----------|----------|
+| **Management API** | `https://api.ilyama.golain.io/core/api/v1` | List services, reflect, poll queued calls, audit |
+| **RPC host** | `https://rpc.ilyama.golain.io` | Unary invoke, SSE server streams, enqueue |
+
+Invoke paths have **no** `/core/api/v1` prefix. Management paths always do.
+
+Local ilyama: management `https://localhost:19090/core/api/v1`, RPC `http://localhost:8082`.
+
+## Auth and permissions
+
+Every request needs:
+
+| Header | Value |
+|--------|-------|
+| `Authorization` | `Bearer {oidc_access_token}` |
+| `ORG-ID` | Organization UUID |
+
+Your user needs `can_invoke_rpc` on the target device. Obtain a token the same way as the Console — see [Authentication](/api-reference/authentication) and [Platform concepts](/getting-started/concepts#authentication).
+
+<Warning>
+  Do not put user OIDC tokens on devices. Keep tokens in your frontend session (or a short-lived BFF) and call Golain from the browser or your backend.
+</Warning>
+
+## Config
+
+```typescript
+// rpc-config.ts
+export const API_BASE = 'https://api.ilyama.golain.io/core/api/v1'
+export const RPC_BASE = 'https://rpc.ilyama.golain.io'
+
+export type RpcScope = {
+  token: string
+  orgId: string
+  projectId: string
+  deviceId: string
+}
+```
+
+In Vite apps, prefer env vars (for example `VITE_API_URL`, `VITE_RPC_URL`) and a [dev proxy](#browser-cors-and-proxy) so the browser never hard-codes secrets into source.
+
+## URL and header helpers
+
+```typescript
+// rpc-client.ts
+import { API_BASE, RPC_BASE, type RpcScope } from './rpc-config'
+
+export type RpcCallType = 'invoke' | 'stream' | 'enqueue'
+
+export function rpcPath(
+  scope: Pick<RpcScope, 'projectId' | 'deviceId'>,
+  service: string,
+  method: string,
+  type: RpcCallType = 'invoke',
+): string {
+  const base = `/projects/${scope.projectId}/devices/${scope.deviceId}`
+  if (type === 'stream') return `${base}/streams/${service}/${method}`
+  if (type === 'enqueue') return `${base}/enqueue/${service}/${method}`
+  return `${base}/${service}/${method}`
+}
+
+export function rpcUrl(
+  scope: Pick<RpcScope, 'projectId' | 'deviceId'>,
+  service: string,
+  method: string,
+  opts?: {
+    type?: RpcCallType
+    sessionId?: string
+    ttlSeconds?: number
+  },
+): string {
+  const type = opts?.type ?? 'invoke'
+  const path = rpcPath(scope, service, method, type)
+  const params = new URLSearchParams()
+  if (opts?.sessionId) params.set('session_id', opts.sessionId)
+  if (opts?.ttlSeconds != null) params.set('ttl_seconds', String(opts.ttlSeconds))
+  const query = params.size ? `?${params}` : ''
+  return `${RPC_BASE}${path}${query}`
+}
+
+export function rpcHeaders(
+  scope: Pick<RpcScope, 'token' | 'orgId'>,
+  opts?: {
+    stream?: boolean
+    idempotencyKey?: string
+  },
+): HeadersInit {
+  const headers: Record<string, string> = {
+    Authorization: `Bearer ${scope.token}`,
+    'ORG-ID': scope.orgId,
+    'Content-Type': 'application/json',
+  }
+  if (opts?.stream) {
+    headers.Accept = 'text/event-stream'
+  } else {
+    headers['Connect-Protocol-Version'] = '1'
+  }
+  if (opts?.idempotencyKey) {
+    headers['Idempotency-Key'] = opts.idempotencyKey
+  }
+  return headers
+}
+
+export function managementUrl(path: string): string {
+  return `${API_BASE}${path.startsWith('/') ? path : `/${path}`}`
+}
+```
+
+## Discover services
+
+```typescript
+// list-services.ts
+import { managementUrl, rpcHeaders, type RpcScope } from './rpc-client'
+
+type RpcMethod = {
+  name: string
+  method_type: 'unary' | 'server_stream' | 'client_stream' | 'bidi_stream'
+}
+
+type RpcService = {
+  name: string
+  methods: RpcMethod[]
+}
+
+export async function listDeviceRpcServices(scope: RpcScope): Promise<{
+  descriptorDigest: string | null
+  services: RpcService[]
+}> {
+  const url = managementUrl(
+    `/projects/${scope.projectId}/devices/${scope.deviceId}/rpc/services`,
+  )
+  const res = await fetch(url, { headers: rpcHeaders(scope) })
+  if (!res.ok) {
+    throw new Error(`list services failed: HTTP ${res.status} ${await res.text()}`)
+  }
+
+  const body = (await res.json()) as {
+    ok: number
+    data: {
+      descriptor_digest?: string | null
+      services?: RpcService[]
+    }
+  }
+
+  return {
+    descriptorDigest: body.data.descriptor_digest ?? null,
+    services: body.data.services ?? [],
+  }
+}
+```
+
+Route calls by `method_type`:
+
+| `method_type` | Call with |
+|---------------|-----------|
+| `unary` | `invokeUnary` or `enqueueUnary` |
+| `server_stream` | `invokeServerStream` (device must be online) |
+| `client_stream`, `bidi_stream` | Device-only — not available from cloud |
+
+## Unary invoke
+
+Synchronous Connect JSON call. Device must be online.
+
+```typescript
+// invoke-unary.ts
+import { rpcHeaders, rpcUrl, type RpcScope } from './rpc-client'
+
+export async function invokeUnary<TResponse = unknown>(
+  scope: RpcScope,
+  service: string,
+  method: string,
+  request: unknown,
+  opts?: { sessionId?: string; signal?: AbortSignal },
+): Promise<TResponse> {
+  const url = rpcUrl(scope, service, method, {
+    type: 'invoke',
+    sessionId: opts?.sessionId,
+  })
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: rpcHeaders(scope),
+    body: JSON.stringify(request),
+    signal: opts?.signal,
+  })
+
+  const text = await res.text()
+  if (!res.ok) {
+    throw new Error(`invoke failed: HTTP ${res.status} ${text}`)
+  }
+
+  return text ? (JSON.parse(text) as TResponse) : ({} as TResponse)
+}
+
+// Example — Echo
+const echo = await invokeUnary<{ message: string; sequence: number }>(
+  scope,
+  'golain.device.v1.EchoService',
+  'Echo',
+  { message: 'hello from my app' },
+  { sessionId: crypto.randomUUID() },
+)
+console.log(echo.message)
+```
+
+Optional `session_id` groups invocations for [audit queries](/edge/device-rpc/invoking-methods#audit-invocation-history). Generate any UUID — there is no session-create API.
+
+## Server stream (SSE)
+
+Server-streaming methods use `POST` + `Accept: text/event-stream`. Prefer `fetch` + `ReadableStream` over `EventSource` so you can send a JSON body and auth headers.
+
+```typescript
+// invoke-stream.ts
+import { rpcHeaders, rpcUrl, type RpcScope } from './rpc-client'
+
+export type SseEvent = {
+  event: string
+  data: string
+}
+
+/** Yield parsed SSE frames from a fetch body. */
+async function* readSse(
+  body: ReadableStream<Uint8Array>,
+  signal?: AbortSignal,
+): AsyncGenerator<SseEvent> {
+  const reader = body.getReader()
+  const decoder = new TextDecoder()
+  let buffer = ''
+  let event = 'message'
+
+  try {
+    while (true) {
+      if (signal?.aborted) {
+        await reader.cancel()
+        return
+      }
+      const { value, done } = await reader.read()
+      if (done) return
+
+      buffer += decoder.decode(value, { stream: true })
+      const lines = buffer.split('\n')
+      buffer = lines.pop() ?? ''
+
+      for (const raw of lines) {
+        const line = raw.trimEnd()
+        if (!line) {
+          event = 'message'
+          continue
+        }
+        if (line.startsWith('event:')) {
+          event = line.slice(6).trim()
+          continue
+        }
+        if (line.startsWith('data:')) {
+          yield { event, data: line.slice(5).trim() }
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock()
+  }
+}
+
+export async function invokeServerStream(
+  scope: RpcScope,
+  service: string,
+  method: string,
+  request: unknown,
+  handlers: {
+    onMessage: (base64Protobuf: string) => void
+    onEvent?: (event: SseEvent) => void
+  },
+  opts?: { sessionId?: string; signal?: AbortSignal },
+): Promise<void> {
+  const url = rpcUrl(scope, service, method, {
+    type: 'stream',
+    sessionId: opts?.sessionId,
+  })
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: rpcHeaders(scope, { stream: true }),
+    body: JSON.stringify(request),
+    signal: opts?.signal,
+  })
+
+  if (!res.ok || !res.body) {
+    throw new Error(`stream failed: HTTP ${res.status} ${await res.text()}`)
+  }
+
+  for await (const frame of readSse(res.body, opts?.signal)) {
+    handlers.onEvent?.(frame)
+    if (frame.event === 'ping') continue
+    if (frame.event === 'message') {
+      handlers.onMessage(frame.data)
+      continue
+    }
+    if (frame.event === 'error') {
+      throw new Error(`stream error: ${frame.data}`)
+    }
+    if (frame.event === 'end' || frame.event === 'cancelled') return
+  }
+}
+
+// Example — stop with AbortController
+const ac = new AbortController()
+await invokeServerStream(
+  scope,
+  'golain.device.v1.EchoService',
+  'EchoServerStream',
+  { message: 'stream me' },
+  {
+    onMessage: (b64) => {
+      // Decode with your protobuf response type after atob / Buffer.from(..., 'base64')
+      console.log('frame', b64)
+    },
+  },
+  { signal: ac.signal },
+)
+```
+
+| SSE `event` | Meaning |
+|-------------|---------|
+| `connected` | Stream opened (`{"stream_id":"…"}`) |
+| `message` | Base64 protobuf response frame |
+| `ping` | Keepalive every **15 s** — ignore |
+| `end` | Normal completion |
+| `error` | Failed — `grpc_status_code` / `grpc_message` |
+| `cancelled` | Cancelled |
+
+<Note>
+  There is no enqueue path for streams. Only call `/streams/` while the device is online.
+</Note>
+
+## Queued invoke
+
+Enqueue when the device may be offline, then poll the management API until a terminal state.
+
+```typescript
+// enqueue.ts
+import { managementUrl, rpcHeaders, rpcUrl, type RpcScope } from './rpc-client'
+
+const TERMINAL = new Set(['succeeded', 'expired', 'dlq'])
+
+export type EnqueueResult = {
+  ok: boolean
+  call_id: string
+  state: string
+  expires_at: string
+}
+
+export type QueuedCall = {
+  call_id: string
+  state: 'pending' | 'in_flight' | 'failed' | 'succeeded' | 'expired' | 'dlq'
+  service_name: string
+  method_name: string
+  attempts: number
+  grpc_status_code?: number | null
+  grpc_message?: string | null
+  /** Base64 protobuf response bytes when succeeded (or already-decoded JSON). */
+  response?: unknown
+  last_error?: string | null
+  expires_at?: string | null
+}
+
+export async function enqueueUnary(
+  scope: RpcScope,
+  service: string,
+  method: string,
+  request: unknown,
+  opts?: {
+    ttlSeconds?: number
+    sessionId?: string
+    /** Reuse on HTTP retry of the same logical enqueue. */
+    idempotencyKey?: string
+  },
+): Promise<EnqueueResult> {
+  const url = rpcUrl(scope, service, method, {
+    type: 'enqueue',
+    ttlSeconds: opts?.ttlSeconds ?? 900,
+    sessionId: opts?.sessionId,
+  })
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: rpcHeaders(scope, {
+      idempotencyKey: opts?.idempotencyKey ?? crypto.randomUUID(),
+    }),
+    body: JSON.stringify(request),
+  })
+
+  const body = (await res.json()) as EnqueueResult & { message?: string }
+  if (!res.ok) {
+    throw new Error(`enqueue failed: HTTP ${res.status} ${body.message ?? ''}`)
+  }
+  return body
+}
+
+export async function getQueuedCall(
+  scope: RpcScope,
+  callId: string,
+): Promise<QueuedCall> {
+  const url = managementUrl(
+    `/projects/${scope.projectId}/devices/${scope.deviceId}/rpc/queued/${callId}`,
+  )
+  const res = await fetch(url, { headers: rpcHeaders(scope) })
+  if (!res.ok) {
+    throw new Error(`poll failed: HTTP ${res.status} ${await res.text()}`)
+  }
+  const body = (await res.json()) as { ok: number; data: QueuedCall }
+  return body.data
+}
+
+export async function waitForQueuedCall(
+  scope: RpcScope,
+  callId: string,
+  opts?: { intervalMs?: number; signal?: AbortSignal },
+): Promise<QueuedCall> {
+  const intervalMs = opts?.intervalMs ?? 1000
+  while (true) {
+    opts?.signal?.throwIfAborted()
+    const call = await getQueuedCall(scope, callId)
+    if (TERMINAL.has(call.state)) return call
+    await new Promise((r) => setTimeout(r, intervalMs))
+  }
+}
+
+// Example
+const { call_id } = await enqueueUnary(
+  scope,
+  'golain.device.v1.EchoService',
+  'Echo',
+  { message: 'hello when online' },
+  { ttlSeconds: 900, idempotencyKey: crypto.randomUUID() },
+)
+
+const done = await waitForQueuedCall(scope, call_id)
+if (done.state !== 'succeeded') {
+  throw new Error(`queued call ${done.state}: ${done.last_error ?? done.grpc_message}`)
+}
+// Decode done.response (base64 protobuf) with your response message type
+```
+
+<Warning>
+  Queued delivery is **at-least-once**. Device handlers must be idempotent. Always send `Idempotency-Key` on enqueue so HTTP retries return the same `call_id`. See [Queued invoke](/edge/device-rpc/queued-invoke).
+</Warning>
+
+## End-to-end example
+
+```typescript
+import { listDeviceRpcServices } from './list-services'
+import { invokeUnary } from './invoke-unary'
+import type { RpcScope } from './rpc-config'
+
+const scope: RpcScope = {
+  token: process.env.GOLAIN_TOKEN!,
+  orgId: process.env.GOLAIN_ORG_ID!,
+  projectId: process.env.GOLAIN_PROJECT_ID!,
+  deviceId: process.env.GOLAIN_DEVICE_ID!,
+}
+
+const { services } = await listDeviceRpcServices(scope)
+const echo = services.find((s) => s.name === 'golain.device.v1.EchoService')
+const unary = echo?.methods.find((m) => m.name === 'Echo' && m.method_type === 'unary')
+if (!unary) throw new Error('Echo unary method not bound — is the device online?')
+
+const result = await invokeUnary<{ message: string }>(
+  scope,
+  echo!.name,
+  unary.name,
+  { message: 'ping' },
+)
+console.log(result.message)
+```
+
+## Browser CORS and proxy
+
+Browsers enforce CORS. If your origin cannot call `rpc.ilyama.golain.io` or `api.ilyama.golain.io` directly, proxy both hosts through your Vite/Next dev server (or a small BFF in production).
+
+```typescript
+// vite.config.ts (sketch)
+export default defineConfig({
+  server: {
+    proxy: {
+      '/api': {
+        target: 'https://api.ilyama.golain.io',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/api/, '/core/api/v1'),
+      },
+      '/rpc': {
+        target: 'https://rpc.ilyama.golain.io',
+        changeOrigin: true,
+        rewrite: (p) => p.replace(/^\/rpc/, ''),
+      },
+    },
+  },
+})
+```
+
+Then set `API_BASE = '/api'` and `RPC_BASE = '/rpc'` in the browser. Keep absolute hosts for Node scripts and server-side callers.
+
+## Errors to handle in UI
+
+| HTTP | Typical cause | UI hint |
+|------|---------------|---------|
+| `401` | Missing/expired token | Re-auth |
+| `403` | Missing `can_invoke_rpc` | Permission error |
+| `404` | Schema unbound or wrong service/method | Refresh services / check device online |
+| `501` | Wrong path for method type | Unary → sync path; `server_stream` → `/streams/` |
+| `504` | Device offline / timed out | Offer queued invoke |
+| `429` / `502` / `503` | Rate limit or transient | Back off and retry |
+
+Full tables: [Invoking methods — Common errors](/edge/device-rpc/invoking-methods#common-errors) and [Troubleshooting](/edge/device-rpc/troubleshooting).
+
+## Related
+
+- [Invoking methods](/edge/device-rpc/invoking-methods) — curl unary + SSE
+- [Queued invoke](/edge/device-rpc/queued-invoke) — TTL, states, idempotency
+- [API reference](/edge/device-rpc/api-reference) — management + proxy routes
+- [Omega setup](/edge/device-rpc/omega-setup) — device-side `device-rpc`
