@@ -75,7 +75,7 @@ Reload Cursor MCP after changing `~/.cursor/mcp.json`.
 | platform-tui | `ilyama/tools/platform-tui/README.md` |
 | Omega install/configure | `omega/docs/*.md` |
 | vm-edge | `ilyama/infra/deploy/vm-edge/README.md` |
-| Console features | `pw/README.md` + product UI |
+| Console features | `pw/README.md` + [Edge Sync](/console/edge-sync) |
 | golain-cli | `golain-cli/ReadME.md` |
 | Edge sync protocol | `ilyama/docs/knowledge/edge-client-guide.md` |
 

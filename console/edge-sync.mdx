@@ -1,0 +1,148 @@
+---
+title: Edge Sync in the console
+description: Configure SQLite replication policies, attach devices, and download Omega deployment bundles from the Golain console.
+---
+
+**Edge Sync** is how you replicate SQLite data from edge devices into Golain. You define sync policies in the **console**, attach them to registered devices, and download a deployment bundle that configures the **Omega agent** on the device.
+
+This guide covers the console workflow end to end. For agent installation and YAML reference, see [Deploy Omega from the console](/edge/data-sync/console-deployment).
+
+## What you get
+
+| Layer | What happens |
+|-------|----------------|
+| **On the device** | Your application keeps writing to a normal SQLite file. The Omega agent watches it, captures changes, and publishes batches over MQTT. |
+| **In the cloud** | Golain ingests row and telemetry batches, stages data during schema review, and materializes approved tables. |
+| **In the console** | You create policies, attach devices, download bundles, and govern replication under **Edge Sync → Governance**. |
+
+## Prerequisites
+
+- A **project** with at least one **fleet** and **device** — see [Fleets and devices](/console/fleets-and-devices)
+- An MQTT **certificate issued** for the target device
+- A SQLite database on the device with tables you want to replicate
+
+## Replication strategies
+
+Each table in a sync policy uses one strategy:
+
+| Strategy | Best for | Requirements |
+|----------|----------|--------------|
+| **`rows`** | Config and state tables with updates and deletes | Table must have a **primary key** |
+| **`telemetry`** | Time-series or append-only data | Set a timestamp column (`ts_column`) |
+| **`ignore`** | Local-only tables | Omitted from the generated agent config |
+
+## Step 1 — Configure cloud replication policy
+
+Project-level governance applies to all devices in the project.
+
+1. Open **Edge Sync → Cloud Policy**.
+2. Set **schema coalescing mode** (`per_device`, `project`, or `fleet`).
+3. Choose whether to **auto-create device data points** for incoming schemas.
+
+Individual sync policies do not override this project policy.
+
+## Step 2 — Create a sync policy
+
+1. Go to **Edge Sync → Sync Policies → New policy**.
+2. **Basics** — name, description, and Omega release channel (`stable`, `latest`, or `dev`).
+3. **Schema sources** — upload `.db` files. The console introspects tables in the browser to help you pick tables and columns.
+4. **Tables** — select which tables to replicate.
+5. **Strategies** — per table, choose `rows`, `telemetry`, or `ignore`. For telemetry, set `ts_column` and optional `include_columns`.
+6. **Review & create.**
+
+The policy stores `table_strategies` — this is what the console writes into the agent config.
+
+## Step 3 — Issue MQTT credentials
+
+1. Open **Fleet & Devices** and select your device.
+2. Go to the **MQTT & Certs** tab.
+3. Click **Issue certificate**.
+
+Certificate key algorithm determines transport:
+
+| Algorithm | Broker URL | Default port |
+|-----------|------------|--------------|
+| **ECDSA** | `quic://` | 8884 |
+| **RSA** | `ssl://` (MQTTS) | 8883 |
+
+4. Download the **certificate bundle** and copy `ca.crt`, `device.crt`, and `device.key` to the device.
+
+<Warning>
+  You must issue a certificate before you can attach a sync policy or download a deployment bundle. The bundle embeds broker URL, `device_id`, and `root_topic` from the live MQTT API.
+</Warning>
+
+## Step 4 — Attach the policy and download the bundle
+
+1. Open your sync policy → **Attach to device** (pick fleet and device).
+2. On the device page (**MQTT & Certs** tab), confirm the **Edge sync policy** is listed.
+3. Select the **binary architecture** (`linux_amd64`, `linux_arm64`, etc.).
+4. Click **Download bundle**.
+
+### Bundle contents
+
+| File | Purpose |
+|------|---------|
+| `omega-config.yaml` | Agent config with MQTT settings and `table_strategies` |
+| `omega-env.sh` | Environment variable exports (broker URL, device ID, paths) |
+| `DEPLOYMENT.md` | Operator notes on safe vs protected config fields |
+| `OMEGA_DOWNLOAD_URL.txt` | Link to download the Omega binary for your channel and arch |
+
+→ Continue with [Deploy Omega from the console](/edge/data-sync/console-deployment) to install and run the agent.
+
+## Step 5 — Verify replication
+
+After the agent is running and your application is writing to the source database:
+
+1. **Edge Sync → Governance → Lineages** — expect one lineage per replicated table. First data may take 25+ seconds after the initial flush.
+2. **Schema Reviews** — new or changed schemas queue for approval when the agent publishes `sync/schema/observe`.
+3. **Registry** — approved schemas appear for reconciliation and downstream use.
+
+→ [Schema review workflow](/edge/data-sync/schema-review-workflow) · [Querying synced data](/edge/data-sync/querying-data)
+
+## Fields you can customize per device
+
+Edit these in `omega-config.yaml` on the device before starting the agent:
+
+- `sqlite-replication.source_db_path` — path to your application's SQLite file
+- `sqlite-replication.state_db_path` — agent cursor and journal metadata
+- Certificate paths under `connection.mqtt.tls`
+- `name` and `connection.device_id` (must match the issued certificate)
+
+## Fields you should not change
+
+These come from the sync policy and MQTT provisioning:
+
+- `table_strategies`
+- `flush_interval`, `modules.required`, `security.capabilities`
+- `connection.server_url`
+
+<Note>
+  The generated YAML uses literal path values. Sourcing `omega-env.sh` alone does not override YAML paths unless you add `source_db_path_env` fields manually. Edit `omega-config.yaml` directly for path changes.
+</Note>
+
+## Troubleshooting (console)
+
+| Problem | Likely cause | Fix |
+|---------|--------------|-----|
+| Cannot attach policy | No MQTT certificate | Issue cert on device first |
+| Download bundle disabled | Missing cert or empty `table_strategies` | Issue cert; ensure policy has tables |
+| Wrong transport | Cert algorithm mismatch | ECDSA → QUIC, RSA → TLS; re-issue if needed |
+| Placeholder broker in preview | Cert not issued yet | Issue cert; bundle uses live MQTT API data |
+| No lineages after deploy | Agent not running or wrong `source_db_path` | See [Troubleshooting](/edge/data-sync/troubleshooting) |
+
+## Related
+
+<CardGroup cols={2}>
+  <Card title="Deploy from console bundle" icon="download" href="/edge/data-sync/console-deployment">
+    Install the Omega agent, run with generated config, verify connectivity.
+  </Card>
+  <Card title="Edge SQLite sync overview" icon="database" href="/edge/data-sync/overview">
+    Lineages, staging, schema governance, and wire protocol.
+  </Card>
+  <Card title="Fleets and devices" icon="server" href="/console/fleets-and-devices">
+    Register devices and issue MQTT certificates.
+  </Card>
+  <Card title="golain omega scaffold" icon="terminal" href="/tools/platform-tui/omega-deploy">
+    Alternative CLI path when you prefer terminal over the console bundle.
+  </Card>
+</CardGroup>
