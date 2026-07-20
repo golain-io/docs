@@ -19,7 +19,7 @@ Synchronous invoke (no `enqueue/` prefix) blocks until the device responds or th
 | **Device must be online** | Yes — call blocks until response or timeout | No — call is stored and delivered later |
 | **HTTP response** | Method response JSON (Connect) | `202 Accepted` with `call_id`, `state`, `expires_at` |
 | **Retries** | Caller retries on failure | Platform retries up to **5** attempts (default) |
-| **Result retrieval** | In the invoke response body | Poll `GET .../rpc/queued/{call_id}` on management API |
+| **Result retrieval** | In the invoke response body | Poll `GET .../rpc/queued/{call_id}` or list `GET .../rpc/queued` on management API |
 | **Delivery guarantee** | Best-effort single attempt | **At-least-once** — device may see duplicates |
 
 For online devices and low-latency control paths, prefer [sync invoke](/edge/device-rpc/invoking-methods). Use queued invoke for offline-tolerant workflows, batch jobs, and integrations that already poll for completion.
@@ -48,7 +48,7 @@ POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/enqu
 |--------|-------|
 | `Authorization` | `Bearer {oidc_access_token}` |
 | `ORG-ID` | Organization UUID |
-| `Content-Type` | `application/json` for JSON payloads — body is stored **as-is** (no proxy transcoding) |
+| `Content-Type` | `application/json` for JSON payloads (stored as `content_type`; poll returns JSON response) |
 | `Idempotency-Key` | **Recommended** — unique per logical enqueue |
 
 ### Example
@@ -83,9 +83,7 @@ curl -sS -X POST \
 
 Save `call_id` for polling.
 
-<Warning>
-  Enqueue stores the request body **as-is** — the proxy does not JSON→protobuf transcode. For JSON queued calls, send the same JSON object you would use on sync invoke; the device receives that stored payload at delivery time. For wire-format delivery, send `application/x-protobuf` bytes directly.
-</Warning>
+The proxy transcodes the request using the same `Content-Type` rules as [sync invoke](/edge/device-rpc/invoking-methods) and stores **naked protobuf wire bytes** for delivery.
 
 ### ttl_seconds
 
@@ -125,10 +123,90 @@ Example poll response:
     "method_name": "Echo",
     "attempts": 1,
     "grpc_status_code": 0,
-    "response": "<base64-encoded-protobuf-bytes>"
+    "content_type": "application/json",
+    "response": {"message": "Echo: hello when online"}
   }
 }
 ```
+
+When `content_type` is `application/x-protobuf` or `application/proto`, `response` is a base64-encoded wire string instead.
+
+If a JSON-typed call cannot be decoded to Connect JSON (for example the device descriptor is missing), `response` is still base64 wire, and the payload includes `response_encoding: "base64"` plus `response_format_error` so clients do not treat the string as a JSON object by mistake.
+
+## List and filter queued calls
+
+To inspect history, pending work, or several known `call_id`s without polling one at a time:
+
+```
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued
+```
+
+Same authz as get-by-id (`can_invoke_rpc`). Filters AND together; omit a param for no constraint.
+
+| Param | Description |
+|-------|-------------|
+| `page`, `limit` | Offset pagination (default `page=1`, `limit=10`, max **100**) |
+| `ids` | Comma-separated call UUIDs |
+| `state` | Exact: `pending`, `in_flight`, `failed`, `succeeded`, `dlq`, or `expired` |
+| `service_name`, `method_name` | Exact match |
+| `created_after`, `created_before` | RFC3339 on `created_at` |
+
+**Pending calls for a device:**
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued?state=pending&page=1&limit=10"
+```
+
+**Filter by service/method and time window:**
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued?service_name=golain.device.v1.EchoService&method_name=Echo&created_after=2026-07-01T00:00:00Z"
+```
+
+**Look up several call IDs:**
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued?ids=$CALL_ID,$OTHER_CALL_ID"
+```
+
+Example list response:
+
+```json
+{
+  "ok": 1,
+  "data": {
+    "items": [
+      {
+        "call_id": "550e8400-e29b-41d4-a716-446655440000",
+        "state": "pending",
+        "service_name": "golain.device.v1.EchoService",
+        "method_name": "Echo",
+        "attempts": 0,
+        "created_at": "2026-07-07T10:15:00Z",
+        "updated_at": "2026-07-07T10:15:00Z",
+        "expires_at": "2026-07-07T10:30:00Z"
+      }
+    ]
+  },
+  "meta": {
+    "current_page": 1,
+    "items_per_page": 10,
+    "total_items": 1,
+    "total_pages": 1
+  }
+}
+```
+
+Items use the same fields as get-by-id (no request body). → Full field list: [API reference — List queued RPC calls](/edge/device-rpc/api-reference#list-queued-rpc-calls)
 
 ### Call states
 
@@ -142,7 +220,7 @@ Example poll response:
 | `dlq` | Exhausted retries or hit a non-retryable error |
 
 <Note>
-  On `succeeded`, the `response` field is **base64-encoded protobuf response bytes**. Decode with your protobuf response type (or a Connect client) after base64 decode — it is not Connect JSON.
+  On `succeeded`, `response` shape follows the stored `content_type` from enqueue: Connect JSON object for `application/json`, base64 wire for binary content types.
 </Note>
 
 ### Platform behavior
@@ -190,6 +268,12 @@ curl -sS \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
   "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued/$CALL_ID"
+
+# List pending / recent for the device
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued?state=pending&limit=10"
 ```
 
 ## Common errors

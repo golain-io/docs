@@ -43,9 +43,10 @@ Invoke, stream, and enqueue require a `Content-Type` appropriate to the request 
 |-----------|------------|
 | `GET …/rpc/services` | `can_invoke_rpc` on device |
 | `GET …/rpc/sessions/{session_id}/invocations` | `can_invoke_rpc` on device |
+| `GET …/rpc/queued` | `can_invoke_rpc` on device |
 | `GET …/rpc/queued/{call_id}` | `can_invoke_rpc` on device |
 | `POST …/rpc/reflect` | `can_write_device_metadata` on device |
-| `GET …/rpc/descriptors/{digest}` | Project-scoped read (standard project auth) |
+| `GET …/rpc/descriptors/{descriptor_id}` | Project-scoped read (standard project auth) |
 | `POST $RPC_PROXY/…/{Service}/{Method}` | `can_invoke_rpc` on device |
 | `POST $RPC_PROXY/…/streams/{Service}/{Method}` | `can_invoke_rpc` on device |
 | `POST $RPC_PROXY/…/enqueue/{Service}/{Method}` | `can_invoke_rpc` on device |
@@ -83,7 +84,13 @@ Request and response encoding depends on the proxy path and `Content-Type` heade
 
 ### Enqueue (`/enqueue/...`)
 
-The request body is **stored as-is** — there is no JSON→protobuf transcoding on enqueue. Send protobuf wire bytes, or JSON that your device handler accepts as the stored payload. For JSON-shaped queued calls, use the same JSON you would send on sync invoke with `application/json`.
+Same request `Content-Type` rules as unary sync invoke. The proxy transcodes to naked protobuf wire before storing the call for delivery.
+
+| `Content-Type` | Request (stored for delivery) |
+|----------------|-------------------------------|
+| `application/json` or empty | Connect JSON → naked protobuf wire |
+| `application/proto` | Connect binary framing → naked protobuf wire |
+| `application/x-protobuf` | Raw protobuf wire (passthrough) |
 
 ---
 
@@ -171,27 +178,26 @@ curl -sS -X POST \
 ## Get project descriptor
 
 ```
-GET /core/api/v1/projects/{project_id}/rpc/descriptors/{digest}
+GET /core/api/v1/projects/{project_id}/rpc/descriptors/{descriptor_id}
 ```
 
 **Permission:** Standard project read auth
 
-Fetches raw descriptor bytes for codegen or inspection. The digest must exist in the project registry.
+Fetches raw descriptor bytes for codegen or inspection. Pass the registry UUID from reflect (`descriptor_id`), not the content digest.
 
 ```bash
 curl -sS \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
-  "$API/projects/$PROJECT_ID/rpc/descriptors/sha256%3A…"
+  "$API/projects/$PROJECT_ID/rpc/descriptors/$DESCRIPTOR_ID"
 ```
-
-URL-encode the digest in the path (for example `sha256:` → `sha256%3A`).
 
 **Response `data` fields:**
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `digest` | string | Same as path parameter |
+| `descriptor_id` | string | Registry UUID (same as path parameter) |
+| `digest` | string | Content-addressed digest, e.g. `sha256:…` |
 | `name` | string | Registry descriptor name |
 | `descriptor_bytes` | string | Base64-encoded serialized `FileDescriptorSet` |
 
@@ -202,23 +208,37 @@ You do not need this endpoint for basic invoke — the proxy loads descriptors a
 ## List invocation audit trail
 
 ```
-GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations?page=&limit=
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations
 ```
 
 **Permission:** `can_invoke_rpc`
 
-Query parameters: `page` (default **1**), `limit` (default **50**).
-
 Pass the same `session_id` you used as `?session_id=` on invoke calls.
+
+**Query parameters** (AND together; omit = no constraint):
+
+| Param | Description |
+|-------|-------------|
+| `page`, `limit` | Offset pagination (default `page=1`, `limit=10`, max **100**) |
+| `service_name` | Exact match on protobuf service name |
+| `method_name` | Exact match on method name |
+| `created_after`, `created_before` | RFC3339 bounds on the invocation `time` column |
 
 ```bash
 curl -sS \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
-  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?page=1&limit=50"
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?page=1&limit=10&service_name=golain.device.v1.EchoService&method_name=Echo"
 ```
 
-**Response:** `ok: 1`, `data.items[]`, and pagination `meta` (`page`, `limit`, `total`).
+**Response:** `ok: 1`, `data.items[]`, and pagination `meta`:
+
+| Meta key | Description |
+|----------|-------------|
+| `current_page` | 1-based page |
+| `items_per_page` | Page size |
+| `total_items` | Total matching rows |
+| `total_pages` | `ceil(total_items / items_per_page)` |
 
 By default, audit is **metadata-only** — no request or response bodies are stored or returned.
 
@@ -267,24 +287,50 @@ Only feature registry keys with **`user_enabled: true`** can be read or written 
 
 ---
 
-## Get queued call status
+## List queued RPC calls
 
 ```
-GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued
 ```
 
 **Permission:** `can_invoke_rpc`
 
-Poll after enqueue. Uses the management API on `api.ilyama.golain.io`, not the RPC host.
+Lists queued calls for a device (history and in-progress). Uses the management API on `api.ilyama.golain.io`, not the RPC host.
+
+**Query parameters** (AND together; omit = no constraint):
+
+| Param | Description |
+|-------|-------------|
+| `page`, `limit` | Offset pagination (default `page=1`, `limit=10`, max **100**) |
+| `ids` | Comma-separated call UUIDs |
+| `state` | Exact: `pending`, `in_flight`, `failed`, `succeeded`, `dlq`, or `expired` |
+| `service_name` | Exact match |
+| `method_name` | Exact match |
+| `created_after`, `created_before` | RFC3339 bounds on `created_at` |
 
 ```bash
 curl -sS \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
-  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued/$CALL_ID"
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued?state=pending&page=1&limit=10"
 ```
 
-**Response `data` fields:**
+**Response envelope:**
+
+```json
+{
+  "ok": 1,
+  "data": { "items": [ /* QueuedRPCCallItem */ ] },
+  "meta": {
+    "current_page": 1,
+    "items_per_page": 10,
+    "total_items": 1,
+    "total_pages": 1
+  }
+}
+```
+
+**Each item** (same shape as get-by-id; no request body):
 
 | Field | Description |
 |-------|-------------|
@@ -293,11 +339,33 @@ curl -sS \
 | `service_name`, `method_name` | Target method |
 | `attempts` | Delivery attempts |
 | `created_at`, `updated_at` | Row timestamps |
-| `expires_at` | TTL deadline |
-| `next_attempt_at` | Scheduled retry (when `failed`) |
+| `expires_at` | TTL deadline (when set) |
+| `next_attempt_at` | Scheduled retry (when set) |
+| `content_type` | Enqueue `Content-Type` (normalized); drives poll `response` shape |
 | `grpc_status_code`, `grpc_message` | Device gRPC result (when available) |
-| `response` | Base64 protobuf response (when `succeeded`) |
-| `last_error` | Platform delivery error text |
+| `response` | Connect JSON object when `content_type` is JSON; base64 wire when binary (when available) |
+| `response_encoding` | `"base64"` when a JSON-typed call could not be decoded and `response` is wire bytes instead |
+| `response_format_error` | Stable reason when `response_encoding` is set |
+| `last_error` | Platform delivery error text (when set) |
+
+---
+
+## Get queued call status
+
+```
+GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}
+```
+
+**Permission:** `can_invoke_rpc`
+
+Poll a single call after enqueue. Response `data` is one `QueuedRPCCallItem` (same fields as list items above).
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/queued/$CALL_ID"
+```
 
 → Step-by-step guide: [Queued invoke](/edge/device-rpc/queued-invoke)
 
@@ -394,7 +462,7 @@ POST https://rpc.ilyama.golain.io/projects/{project_id}/devices/{device_id}/enqu
 
 **Query:** optional `ttl_seconds` — default **900**, clamped **60**–**86400**.
 
-**Headers:** `Authorization`, `ORG-ID`, `Content-Type` (body stored as-is — see [enqueue row](#content-type-matrix)); add **`Idempotency-Key`** when retrying the same enqueue.
+**Headers:** `Authorization`, `ORG-ID`, `Content-Type` (same transcoding as sync invoke — see [enqueue row](#content-type-matrix)); add **`Idempotency-Key`** when retrying the same enqueue.
 
 ```bash
 curl -sS -X POST \
@@ -417,7 +485,7 @@ curl -sS -X POST \
 }
 ```
 
-Poll completion with `GET …/rpc/queued/{call_id}` on the management API.
+Poll completion with `GET …/rpc/queued/{call_id}`, or list with filters via `GET …/rpc/queued`, on the management API.
 
 <Note>
   Queued delivery is **at-least-once**. Device handlers must be idempotent — see [Queued invoke](/edge/device-rpc/queued-invoke).
@@ -434,8 +502,9 @@ These management routes appear in the **API Reference** tab under **Device RPC**
 - `GET /projects/{project_id}/devices/{device_id}/rpc/services`
 - `POST /projects/{project_id}/devices/{device_id}/rpc/reflect`
 - `GET /projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations`
+- `GET /projects/{project_id}/devices/{device_id}/rpc/queued`
 - `GET /projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}`
-- `GET /projects/{project_id}/rpc/descriptors/{digest}`
+- `GET /projects/{project_id}/rpc/descriptors/{descriptor_id}`
 
 Open the playground from [API introduction](/api-reference/introduction). **Sync invoke, server-stream SSE, and enqueue** proxies are documented here — they are **not** in the OpenAPI spec. Use curl or a Connect client against the RPC host (`https://rpc.ilyama.golain.io`).
 

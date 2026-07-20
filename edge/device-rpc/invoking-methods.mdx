@@ -192,7 +192,7 @@ Decode each `message` event's data with your protobuf response type after base64
 | Invoke method (RPC host) | `can_invoke_rpc` on device |
 | Stream method (`/streams/...` on RPC host) | `can_invoke_rpc` on device |
 | List services | `can_invoke_rpc` on device |
-| Poll queued call status | `can_invoke_rpc` on device |
+| Poll / list queued calls | `can_invoke_rpc` on device |
 | Query invocation history | `can_invoke_rpc` on device |
 | Force schema reflect | `can_write_device_metadata` on device |
 
@@ -208,8 +208,25 @@ export API=https://api.ilyama.golain.io
 curl -sS \
   -H "Authorization: Bearer $TOKEN" \
   -H "ORG-ID: $ORG_ID" \
-  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?page=1&limit=50"
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?page=1&limit=10"
 ```
+
+**Optional filters** (AND together; omit = no constraint):
+
+| Param | Description |
+|-------|-------------|
+| `page`, `limit` | Offset pagination (default `page=1`, `limit=10`, max **100**) |
+| `service_name`, `method_name` | Exact match |
+| `created_after`, `created_before` | RFC3339 bounds on the invocation `time` column |
+
+```bash
+curl -sS \
+  -H "Authorization: Bearer $TOKEN" \
+  -H "ORG-ID: $ORG_ID" \
+  "$API/core/api/v1/projects/$PROJECT_ID/devices/$DEVICE_ID/rpc/sessions/$SESSION_ID/invocations?service_name=golain.device.v1.EchoService&method_name=Echo&created_after=2026-07-01T00:00:00Z"
+```
+
+Response shape: `data.items[]` plus pagination `meta` (`current_page`, `items_per_page`, `total_items`, `total_pages`).
 
 By default, audit is **metadata-only** — each row includes `service_name`, `method_name`, `grpc_status_code`, `latency_ms`, and `trace_id`. Request and response bodies are not stored or returned unless payload capture is enabled for the project.
 
