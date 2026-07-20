@@ -99,7 +99,7 @@ The proxy transcodes the request using the same `Content-Type` rules as [sync in
 GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}
 ```
 
-Uses the management API on `api.ilyama.golain.io`, not the RPC host. Requires `can_invoke_rpc` on the device.
+Uses the management API on `api.ilyama.golain.io`, not the RPC host. Requires `can_read_rpc` on the device (`can_invoke_rpc` implies it).
 
 ```bash
 export API=https://api.ilyama.golain.io
@@ -141,7 +141,7 @@ To inspect history, pending work, or several known `call_id`s without polling on
 GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued
 ```
 
-Same authz as get-by-id (`can_invoke_rpc`). Filters AND together; omit a param for no constraint.
+Same authz as get-by-id (`can_read_rpc`). Filters AND together; omit a param for no constraint.
 
 | Param | Description |
 |-------|-------------|
@@ -281,7 +281,7 @@ curl -sS \
 | HTTP status | Message | Meaning |
 |-------------|---------|---------|
 | 401 | `unauthorized` | Missing or invalid bearer token |
-| 403 | `forbidden` | Missing `can_invoke_rpc` |
+| 403 | `forbidden` | Missing `can_invoke_rpc` (enqueue) or `can_read_rpc` (poll/list) |
 | 404 | `not found` | Bad enqueue URL or unknown `call_id` on poll |
 | 409 | `request already in progress` | Duplicate `Idempotency-Key` while first enqueue still running |
 | 400 | `invalid ttl_seconds` | Malformed TTL query parameter |

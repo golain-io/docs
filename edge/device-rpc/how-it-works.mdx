@@ -46,7 +46,7 @@ If the device disconnects and reconnects, Golain refreshes the binding. When the
 ### Unary (sync invoke)
 
 1. Your app sends an HTTP POST with a JSON body to the **RPC host** (`https://rpc.ilyama.golain.io`) — `/{Service}/{Method}` in the URL, no `/core/api/v1` prefix. The proxy accepts Connect JSON (`application/json`), Connect binary (`application/proto`), or raw wire (`application/x-protobuf`) — see [Content-Type matrix](/edge/device-rpc/invoking-methods#content-type-matrix).
-2. Golain checks your token, organization, and `can_invoke_rpc` permission on the device.
+2. Golain checks your token, organization, and the matching device permission (`can_invoke_rpc` for invoke/enqueue/stream; `can_read_rpc` for management reads).
 3. Golain delivers the call to the device and waits for the handler to finish.
 4. Golain returns Connect JSON (default), Connect binary, or wire bytes depending on how you called.
 

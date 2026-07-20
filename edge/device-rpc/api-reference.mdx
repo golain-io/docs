@@ -41,15 +41,17 @@ Invoke, stream, and enqueue require a `Content-Type` appropriate to the request 
 
 | Operation | Permission |
 |-----------|------------|
-| `GET …/rpc/services` | `can_invoke_rpc` on device |
-| `GET …/rpc/sessions/{session_id}/invocations` | `can_invoke_rpc` on device |
-| `GET …/rpc/queued` | `can_invoke_rpc` on device |
-| `GET …/rpc/queued/{call_id}` | `can_invoke_rpc` on device |
+| `GET …/rpc/services` | `can_read_rpc` on device |
+| `GET …/rpc/sessions/{session_id}/invocations` | `can_read_rpc` on device |
+| `GET …/rpc/queued` | `can_read_rpc` on device |
+| `GET …/rpc/queued/{call_id}` | `can_read_rpc` on device |
 | `POST …/rpc/reflect` | `can_write_device_metadata` on device |
 | `GET …/rpc/descriptors/{descriptor_id}` | Project-scoped read (standard project auth) |
 | `POST $RPC_PROXY/…/{Service}/{Method}` | `can_invoke_rpc` on device |
 | `POST $RPC_PROXY/…/streams/{Service}/{Method}` | `can_invoke_rpc` on device |
 | `POST $RPC_PROXY/…/enqueue/{Service}/{Method}` | `can_invoke_rpc` on device |
+
+`can_invoke_rpc` implies `can_read_rpc`, so callers who can invoke can also list services, poll queued calls, and read invocation history.
 
 ## Rate limits
 
@@ -100,7 +102,7 @@ Same request `Content-Type` rules as unary sync invoke. The proxy transcodes to 
 GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/services
 ```
 
-**Permission:** `can_invoke_rpc`
+**Permission:** `can_read_rpc`
 
 ```bash
 curl -sS \
@@ -211,7 +213,7 @@ You do not need this endpoint for basic invoke — the proxy loads descriptors a
 GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/sessions/{session_id}/invocations
 ```
 
-**Permission:** `can_invoke_rpc`
+**Permission:** `can_read_rpc`
 
 Pass the same `session_id` you used as `?session_id=` on invoke calls.
 
@@ -293,7 +295,7 @@ Only feature registry keys with **`user_enabled: true`** can be read or written 
 GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued
 ```
 
-**Permission:** `can_invoke_rpc`
+**Permission:** `can_read_rpc`
 
 Lists queued calls for a device (history and in-progress). Uses the management API on `api.ilyama.golain.io`, not the RPC host.
 
@@ -356,7 +358,7 @@ curl -sS \
 GET /core/api/v1/projects/{project_id}/devices/{device_id}/rpc/queued/{call_id}
 ```
 
-**Permission:** `can_invoke_rpc`
+**Permission:** `can_read_rpc`
 
 Poll a single call after enqueue. Response `data` is one `QueuedRPCCallItem` (same fields as list items above).
 

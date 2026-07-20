@@ -14,7 +14,7 @@ For offline-tolerant or retry-friendly workflows, use [Queued invoke](/edge/devi
 ## Before you invoke
 
 1. Device is **online** with `device-rpc` running and schema **bound** — see [Omega setup](/edge/device-rpc/omega-setup).
-2. Your user has **`can_invoke_rpc`** on the target device.
+2. Your user has **`can_invoke_rpc`** on the target device (implies `can_read_rpc` for discovery/history).
 3. You know the **full protobuf service name** and **method name** — discover them via the services API below.
 
 ## Discover available methods
@@ -191,12 +191,13 @@ Decode each `message` event's data with your protobuf response type after base64
 |--------|------------|
 | Invoke method (RPC host) | `can_invoke_rpc` on device |
 | Stream method (`/streams/...` on RPC host) | `can_invoke_rpc` on device |
-| List services | `can_invoke_rpc` on device |
-| Poll / list queued calls | `can_invoke_rpc` on device |
-| Query invocation history | `can_invoke_rpc` on device |
+| Enqueue method (RPC host) | `can_invoke_rpc` on device |
+| List services | `can_read_rpc` on device |
+| Poll / list queued calls | `can_read_rpc` on device |
+| Query invocation history | `can_read_rpc` on device |
 | Force schema reflect | `can_write_device_metadata` on device |
 
-Missing permission returns `403 forbidden`.
+`can_invoke_rpc` implies `can_read_rpc`. Missing permission returns `403 forbidden`.
 
 ## Audit invocation history
 
@@ -318,7 +319,7 @@ Use the sync path for unary methods and `/streams/` for `server_stream` methods 
 | HTTP status | Message | Meaning |
 |-------------|---------|---------|
 | 401 | `unauthorized` | Missing or invalid bearer token |
-| 403 | `forbidden` | Missing `can_invoke_rpc` |
+| 403 | `forbidden` | Missing `can_invoke_rpc` (invoke) or `can_read_rpc` (reads) |
 | 404 | `device descriptor not found` | Schema not bound — see [Troubleshooting](/edge/device-rpc/troubleshooting) |
 | 404 | `service not found in descriptor` | Wrong service name in URL |
 | 404 | `method not found in descriptor` | Wrong method name |

@@ -166,7 +166,7 @@ Update Omega client YAML or `OMEGA_ROOT_TOPIC`, redeploy, and verify list servic
 
 **Fix:**
 
-Grant **`can_invoke_rpc`** on the target device for your user or permission group. Reflect additionally requires **`can_write_device_metadata`**.
+Grant **`can_invoke_rpc`** to call methods (implies **`can_read_rpc`** for listing services, queued polls, and invocation history). Grant **`can_read_rpc`** alone for read-only access. Reflect additionally requires **`can_write_device_metadata`**.
 
 Update permissions in Console, then retry.
 
