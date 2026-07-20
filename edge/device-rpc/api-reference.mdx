@@ -57,9 +57,11 @@ Invoke, stream, and enqueue require a `Content-Type` appropriate to the request 
 
 | Surface | Approx. limit |
 |---------|---------------|
-| Management routes | 12–64 req/s (varies by endpoint) |
-| Sync invoke (RPC host) | 32 req/s |
-| Enqueue (RPC host) | 12 req/s |
+| Management GETs (services, descriptors, invocations, queued) | 64 req/s |
+| Reflect (`POST …/rpc/reflect`) | 12 req/s |
+| Sync invoke (RPC host) | 32 req/s per org+device |
+| Enqueue (RPC host) | 12 req/s per org+device |
+| Server stream (RPC host) | 8 req/s per org+device |
 
 Back off on `429`, `502`, and `503`.
 
@@ -82,7 +84,9 @@ Request and response encoding depends on the proxy path and `Content-Type` heade
 | `Content-Type` | Request | Response |
 |----------------|---------|----------|
 | `application/json` or empty | JSON — transcoded to wire before device relay | SSE (`text/event-stream`), base64 protobuf `message` events |
-| `application/proto` or `application/x-protobuf` | Naked wire passthrough | SSE, base64 protobuf `message` events |
+| `application/proto` or `application/x-protobuf` | Naked wire passthrough (on this path `application/proto` is **not** Connect framing) | SSE, base64 protobuf `message` events |
+
+Other stream Content-Types return **415** `unsupported content type`.
 
 ### Enqueue (`/enqueue/...`)
 

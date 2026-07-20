@@ -230,7 +230,7 @@ Items use the same fields as get-by-id (no request body). → Full field list: [
 | Default TTL | **900** s (clamp **60**–**86400**) |
 | Max delivery attempts | **5** |
 | Stale `in_flight` reclaim | **120** s — main source of duplicate device invocations |
-| Per-attempt invoke timeout | **60** s |
+| Per-attempt invoke timeout | **15** s |
 
 ## Device-side idempotency
 

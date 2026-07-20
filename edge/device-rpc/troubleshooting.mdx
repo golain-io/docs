@@ -52,7 +52,7 @@ flowchart TD
 | Queued call stuck or expired | Device offline past TTL | [Queued stuck or duplicates](#queued-stuck-or-duplicates) |
 | Duplicate side effects from queued RPC | Handler not idempotent | [Queued idempotency](#queued-idempotency) |
 | `invalid json request body` (400) on stream | Wrong `Content-Type` or malformed JSON for stream open | [Content-Type and transcoding](#content-type-and-transcoding) |
-| `unsupported content type` (415) on stream | Connect binary or gRPC-Web on `/streams/` path | [Content-Type and transcoding](#content-type-and-transcoding) |
+| `unsupported content type` (415) on stream | Unsupported `Content-Type` on `/streams/` (not JSON / `application/proto` / `application/x-protobuf`) | [Content-Type and transcoding](#content-type-and-transcoding) |
 | Schema never appears after device connects | Self-hosted stack misconfiguration | [Self-hosted operators](#self-hosted-operators) |
 
 ---
@@ -243,9 +243,9 @@ For client-stream and bidi methods (`EchoClientStream`, `EchoBidiStream`), use d
 
 **Cause:**
 
-The RPC proxy transcodes request bodies by path and `Content-Type`. Server streams accept **`application/json`** (transcoded to wire), **`application/proto`**, or **`application/x-protobuf`** (passthrough). Connect binary framing (`application/proto`) is **not** supported on the stream path — use JSON or raw wire.
+The RPC proxy transcodes request bodies by path and `Content-Type`. On **`/streams/`**, `application/proto` and `application/x-protobuf` both mean **naked protobuf wire** (passthrough). On **unary** invoke, `application/proto` means **Connect binary framing** (Vanguard) and `application/x-protobuf` is the naked-wire fast path. Other stream Content-Types (for example gRPC-Web) return **415**.
 
-Unary sync invoke returns Connect JSON only when you send `application/json` (or empty `Content-Type`). `application/x-protobuf` uses the fast wire path and responds with `application/proto`.
+Unary sync invoke returns Connect JSON when you send `application/json` (or empty `Content-Type`). `application/x-protobuf` responds with `application/proto` wire bytes.
 
 **Fix:**
 
@@ -253,7 +253,8 @@ Unary sync invoke returns Connect JSON only when you send `application/json` (or
 |------|------|----------------|------|
 | Curl unary Echo | `/{Service}/{Method}` | `application/json` | `{"message":"…"}` |
 | Curl server stream | `/streams/{Service}/{Method}` | `application/json` | `{"message":"…"}` |
-| Generated client, raw wire | either path (stream: wire only) | `application/x-protobuf` | protobuf-encoded request |
+| Generated client, raw wire | either path | `application/x-protobuf` | naked protobuf request |
+| Stream with naked `application/proto` | `/streams/{Service}/{Method}` | `application/proto` | naked protobuf request (not Connect-framed) |
 | Generated Connect client (unary) | `/{Service}/{Method}` | `application/proto` | Connect binary framing |
 
 `Connect-Protocol-Version: 1` is optional for JSON unary — the proxy injects it when absent.
@@ -384,7 +385,7 @@ curl -sS -X POST \
   -d '{"message":"diagnostic ping"}'
 ```
 
-Local dev: set `API=https://localhost:19090/core/api/v1` and `RPC_PROXY=http://localhost:8082`.
+Local dev: `export API=https://localhost:19090` and `export RPC_PROXY=http://localhost:8082`, then use `$API/core/api/v1/projects/...` for management routes.
 
 ## Still stuck?
 

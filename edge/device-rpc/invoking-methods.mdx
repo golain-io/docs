@@ -154,6 +154,8 @@ Use **`curl -N`** (no buffer) so events print as they arrive. Optional `?session
 | `application/json` or empty | JSON object — proxy transcodes to protobuf wire before relaying to the device |
 | `application/proto` or `application/x-protobuf` | Naked protobuf wire bytes — passed through as-is |
 
+On `/streams/`, `application/proto` means **naked wire** (unlike unary, where it means Connect binary framing). Other Content-Types return **415**.
+
 Response is always **SSE** with base64 protobuf frames in `message` events (unchanged).
 
 ### Example: EchoServerStream

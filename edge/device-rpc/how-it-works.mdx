@@ -69,8 +69,8 @@ Use `curl -N` so the client does not buffer events. See [Stream a method (SSE)](
 
 | Method type | Cloud path | Notes |
 |-------------|------------|-------|
-| **Unary** | `POST https://rpc.ilyama.golain.io/.../{Service}/{Method}` | Connect JSON request and response |
-| **Server stream** | `POST https://rpc.ilyama.golain.io/.../streams/{Service}/{Method}` | SSE (`text/event-stream`) |
+| **Unary** | `POST https://rpc.ilyama.golain.io/.../{Service}/{Method}` | JSON, Connect binary, or raw wire — see [Content-Type matrix](/edge/device-rpc/api-reference#content-type-matrix) |
+| **Server stream** | `POST https://rpc.ilyama.golain.io/.../streams/{Service}/{Method}` | SSE (`text/event-stream`); JSON or naked wire request |
 | **Client stream** | — | Device only — sync path returns **501** `streaming rpc not supported` |
 | **Bidi stream** | — | Device only — sync path returns **501** `streaming rpc not supported` |
 
