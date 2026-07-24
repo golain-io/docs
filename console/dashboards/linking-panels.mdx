@@ -1,0 +1,88 @@
+---
+title: Linking transforms to panels
+description: Map transform output columns onto line, bar, XY line, gauge, and stat/KPI charts.
+---
+
+Once a transform produces the columns you want (see [Transforming panel data](/console/dashboards/transforms)), the **Build** tab's visualization settings map those columns onto the chart. Different chart types read different mappings.
+
+## Which mapping each chart type uses
+
+| Chart type | Reads |
+|------------|-------|
+| Table | Whichever columns you add to **Table columns** |
+| Line / Bar / Area | **X axis columns** + **Y axis columns** |
+| XY line | An explicit **X** column + **Y** column (both numeric — not time-based) |
+| Gauge / Stat / KPI | A single **Measure** column, mapped internally to `value` |
+
+Transform output columns always appear in these pickers **after** the raw table columns — scroll to the bottom of the list.
+
+## Walkthrough: bar chart from an unnested array
+
+This continues the `cell_idx` / `cell_voltage` transform from the previous page.
+
+<Steps>
+  <Step title="Set the visualization type">
+    In the **Build** tab, set **Visualization** to **Bar chart**.
+  </Step>
+  <Step title="Open the X axis columns picker">
+    Click into **X axis columns**. Raw table columns are listed first; transform outputs (`cell_idx`, `cell_voltage`, …) are at the bottom.
+
+    <Frame>
+      <img src="/images/console/dashboards/07-axis-dropdown-transform-columns.jpg" alt="X axis columns dropdown showing raw columns above, cell_idx and cell_voltage below" />
+    </Frame>
+  </Step>
+  <Step title="Map X and Y to the transform output">
+    Uncheck the default raw column, check `cell_idx` for X. Do the same for **Y axis columns**, selecting `cell_voltage`.
+
+    <Frame>
+      <img src="/images/console/dashboards/08-axis-mapped-to-transform-output.jpg" alt="X axis columns set to cell_idx, Y axis columns set to cell_voltage" />
+    </Frame>
+  </Step>
+  <Step title="Check the live preview">
+    Scroll down — the **Preview** pane renders against your actual data as soon as both axes are mapped.
+
+    <Frame>
+      <img src="/images/console/dashboards/09-bar-chart-preview.jpg" alt="Live bar chart preview of 96 cell voltages" />
+    </Frame>
+  </Step>
+  <Step title="Save">
+    Click **Create Panel** (or **Save** on an existing panel).
+  </Step>
+</Steps>
+
+## Walkthrough: gauge / stat from an aggregated value
+
+Gauge and Stat/KPI panels show a single number, so your transform should produce exactly one row with one numeric column.
+
+<Steps>
+  <Step title="Write a single-value transform">
+    Alias your output column to `value` — it's the field the gauge falls back to by default:
+
+    ```sql
+    WITH latest AS (
+      SELECT * FROM raw ORDER BY event_ts DESC LIMIT 1
+    )
+    SELECT avg(u.v) AS value
+    FROM latest, unnest(cell_voltages) AS u(v)
+    ```
+  </Step>
+  <Step title="Set the visualization type">
+    Set **Visualization** to **Gauge** (or **Stat / KPI**).
+  </Step>
+  <Step title="Set the Measure">
+    Set **Measure** to your transform's output column (`value`, or whatever you aliased it to).
+  </Step>
+  <Step title="Set Min/Max Display">
+    Under **Gauge settings**, set **Min Display** / **Max Display** to a range that fits your metric — the defaults (0–100) suit a percentage, not a raw voltage or count. For a 0–100% SoC value, the defaults are already correct.
+  </Step>
+</Steps>
+
+<Warning>
+  There's a known picker issue where selecting a transform-output column as **Measure** on a Gauge/Stat panel can snap back to a raw column instead of holding your selection — which then renders as `0` because that raw column doesn't exist in the transformed row. If this happens after following the steps above, see [Troubleshooting: gauge or stat shows 0](/console/dashboards/troubleshooting#gauge-or-stat-shows-0) for the current workaround.
+</Warning>
+
+## Next step
+
+<Card title="Troubleshooting" icon="triangle-exclamation" href="/console/dashboards/troubleshooting">
+  Panel shows "No data", a chart reads 0, or a transform column won't map.
+</Card>
