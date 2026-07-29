@@ -1,0 +1,52 @@
+---
+title: Dashboard troubleshooting
+description: Panel shows "No data", a chart reads 0, or a transform column won't map onto a chart.
+---
+
+## Panel shows "No data"
+
+<Frame>
+  <img src="/images/console/dashboards/10-dashboard-nodata-live-filter.jpg" alt="Saved panel showing No data while the dashboard filter is set to Live" />
+</Frame>
+
+**Cause:** the dashboard's time filter (top of the dashboard, e.g. **Live**, **1h**, **Custom**) applies to the panel's underlying query. If your table has no rows inside that window — a device that stopped reporting, historical data, a test fixture — the panel has nothing to render, transform or no transform.
+
+**Fix:** widen or move the dashboard's time filter (**FILTERS** → **Custom**) to a range that actually contains data for that source table. Note this is separate from the transform preview inside the panel editor, which always previews against the latest available rows regardless of the dashboard filter — so a transform that worked in the editor can still show "No data" once saved to a dashboard on a narrow filter.
+
+This is a common trap on a newly wired-up table or a device that's gone quiet — check when the table actually has data (e.g. via **Data Explorer**) before assuming the transform or panel config is broken.
+
+## Gauge or stat shows 0
+
+A Gauge or Stat/KPI panel reads a single `value` field from the transformed row. It reads `0` when that field is missing — most often because the **Measure** picker is pointed at a column that doesn't exist in your transform's output (a raw column name instead of your transform's output column).
+
+**Checklist:**
+
+1. Re-run the transform (**Transform** tab → **Run transform**) and confirm the exact output column name under **Output columns**.
+2. On the **Build** tab, confirm **Measure** matches that name exactly — including case.
+3. If your transform outputs are aliased to `value`, confirm the picker actually shows `value` selected, not a raw column like `id`.
+
+<Warning>
+  **Known issue:** selecting a transform-output column (e.g. `value`) in the **Measure** dropdown for a Gauge/Stat panel can silently snap back to a raw column instead of holding the selection — with no error shown. The dropdown will still visually show the old raw column after you pick the transform output.
+
+  <Frame>
+    <img src="/images/console/dashboards/11-measure-defaults-to-raw-column.jpg" alt="Measure dropdown reverted to id (bigint) instead of the transform's value output" />
+  </Frame>
+
+  **Workaround:** alias your transform's output to `value` (the field Gauge/Stat falls back to when nothing else is mapped), save the panel, then re-open it for editing. If the Measure field still doesn't hold your selection, this needs a fix in the panel editor rather than a transform change — flag it to your team rather than reworking the SQL further.
+</Warning>
+
+## A transform-output column doesn't appear in the axis/measure picker
+
+1. Confirm you clicked **Run transform** after your latest SQL edit — pickers only see columns from the last successful run, not what's currently typed in the editor.
+2. Transform outputs are listed **after** all raw table columns in X/Y axis pickers — scroll down.
+3. If the panel was saved before the transform was added or changed, reopening the editor re-syncs available columns; a stale in-progress edit may not.
+
+## Transform SQL fails to run
+
+- **Unbalanced parentheses in a `WITH` CTE** are the most common typo — the editor auto-inserts a closing `)` when you type `(`, which can end up in the wrong place if you also type your own closing paren. Check the CTE closes right after its `SELECT`, not at the end of the whole query.
+- **Referencing a column that isn't marked as a structured column** — if a column holds encoded JSON (bytea/base64), mark it under **Structured columns** first (see [Transforming panel data](/console/dashboards/transforms#structured-columns-decoding-encoded-telemetry)) so DuckDB sees a real array/object instead of an opaque string.
+- **Referencing a transform-output column from the raw query** (e.g. in a manually-edited **QueryScript YAML** `order_by` or `select`) — the raw query runs against the source table *before* the transform, so it can only reference columns that exist there.
+
+## Still stuck
+
+Check the exact request/response for the panel's query via your browser's network tab (**queryscript** calls), or ask in your team's support channel with the panel's transform SQL and the **Input columns** / **Output columns** lists from the Transform tab — that's usually enough to pinpoint a column-name mismatch.

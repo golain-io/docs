@@ -63,6 +63,15 @@
               "console/integrations",
               "console/settings"
             ]
+          },
+          {
+            "group": "Dashboards",
+            "pages": [
+              "console/dashboards/overview",
+              "console/dashboards/transforms",
+              "console/dashboards/linking-panels",
+              "console/dashboards/troubleshooting"
+            ]
           }
         ]
       },
