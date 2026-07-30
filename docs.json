@@ -60,6 +60,7 @@
               "console/overview",
               "console/fleets-and-devices",
               "console/edge-sync",
+              "console/ota",
               "console/integrations",
               "console/settings"
             ]
@@ -233,6 +234,12 @@
       ]
     }
   },
+  "redirects": [
+    {
+      "source": "/edge/data-sync/protocol-reference",
+      "destination": "/edge/data-sync/topics-and-connection"
+    }
+  ],
   "contextual": {
     "options": ["copy", "view", "chatgpt", "claude", "cursor", "mcp"]
   },
