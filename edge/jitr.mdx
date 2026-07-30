@@ -1,9 +1,9 @@
 ---
 title: JITR enrollment
-description: Just-in-Time Registration — issue a fleet bootstrap certificate, enroll Omega, and connect with mTLS.
+description: Just-in-Time Registration — issue a fleet bootstrap certificate in the console, enroll Omega, and connect with mTLS.
 ---
 
-**Just-in-Time Registration (JITR)** lets a device create itself on Golain the first time it boots. You flash one shared **fleet bootstrap certificate** into your image; on first start Omega generates its own private key, asks the platform to sign it, and receives a **device certificate** plus the **MQTT broker URL**. No per-device secrets in your firmware, no manual console step per unit.
+**Just-in-Time Registration (JITR)** lets a device create itself on Golain the first time it boots. You issue one shared **fleet bootstrap certificate** in the console, flash the certificate into your image, and on first start Omega generates its own private key, asks the platform to sign it, and receives a **device certificate** plus the **MQTT broker URL**. No per-device secrets in your firmware, no manual console step per unit.
 
 <Note>
   Omega generates the private key **on the device** and sends only a CSR. The private key never leaves the device and is never known to the platform.
@@ -19,15 +19,11 @@ description: Just-in-Time Registration — issue a fleet bootstrap certificate, 
 
 ## How it works
 
-1. Omega generates an ECDSA P-256 key pair and a CSR with `CN = device_name`.
-2. Omega `POST`s the CSR **and the bootstrap certificate PEM** to `/core/api/v1/devices/jitr`.
-3. The platform verifies the bootstrap certificate chains to its CA, is active, and is scoped to the `org_id` + `fleet_id` in the request.
-4. The platform **creates the device record**, signs the CSR, and decrements the bootstrap certificate's device quota.
+1. In the console you issue a **fleet bootstrap certificate** and download the bundle.
+2. On first boot Omega generates an ECDSA P-256 key pair and a CSR with `CN = device_name`.
+3. Omega posts the CSR and the bootstrap certificate PEM to the platform JITR endpoint.
+4. The platform verifies the bootstrap certificate, **creates the device record**, signs the CSR, and decrements the certificate's device quota.
 5. Omega writes `device.crt`, `device.key`, and `metadata.json`, then connects over mTLS.
-
-<Warning>
-  **The bootstrap certificate travels in the request body, not as a TLS client certificate.** The JITR endpoint is unauthenticated — no bearer token, no mTLS handshake. Trust comes entirely from the bootstrap certificate PEM being valid, active, and fleet-scoped. Treat the bootstrap certificate and its key as fleet-wide secrets.
-</Warning>
 
 <Warning>
   **Do not pre-create the device in the console.** JITR creates the device record itself. If a device with the same name already exists in the project, enrollment fails with **409 `DEVICE_NAME_ALREADY_IN_USE`**.
@@ -38,9 +34,8 @@ description: Just-in-Time Registration — issue a fleet bootstrap certificate, 
 | Requirement | How to get it |
 |-------------|---------------|
 | Organization, Project, and Fleet | [Console → Fleets and devices](/console/fleets-and-devices) |
-| `PROJECT_CAN_MANAGE_DEVICES` permission | Required to issue a bootstrap certificate |
-| An access token and your Org ID | [API authentication](/api-reference/authentication) |
-| Project device capacity | Enrollment fails with `PROJECT_DEVICE_LIMIT_REACHED` if the tier limit is hit |
+| Permission to manage devices | Needed to click **Issue certificate** |
+| Project device capacity | Enrollment fails if the project tier device limit is reached |
 
 There is no per-fleet "enable JITR" toggle. A fleet supports JITR as soon as it has an active bootstrap certificate.
 
@@ -48,96 +43,120 @@ There is no per-fleet "enable JITR" toggle. A fleet supports JITR as soon as it 
 
 <Steps>
 
-<Step title="Issue a fleet bootstrap certificate">
+<Step title="Open Fleet & Devices">
 
-One call per fleet. `max_devices` caps how many devices this certificate can enroll (1–1000).
+In the console, open **Fleet & Devices** for your project. Pick the fleet that will own the devices (or create one first).
 
-```bash
-export TOKEN=<your-access-token>
-export ORG_ID=<your-org-uuid>
-export PROJECT_ID=<your-project-uuid>
-export FLEET_ID=<your-fleet-uuid>
+<img src="/images/edge/jitr/01-fleet-list.jpg" alt="Fleet & Devices list showing fleets such as Production Sensors" />
 
-curl -sS -X POST \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "ORG-ID: $ORG_ID" \
-  -H "Content-Type: application/json" \
-  -d '{"max_devices": 500}' \
-  "https://api.ilyama.golain.io/core/api/v1/projects/$PROJECT_ID/fleets/$FLEET_ID/bootstrap-certs"
-```
+</Step>
 
-Response:
+<Step title="Open the fleet">
 
-```json
-{
-  "ok": 1,
-  "data": {
-    "certId": "…",
-    "serial": "…",
-    "certPem": "-----BEGIN CERTIFICATE-----\n…",
-    "keyPem": "-----BEGIN PRIVATE KEY-----\n…",
-    "caCertPem": "-----BEGIN CERTIFICATE-----\n…",
-    "expiresAt": "…",
-    "maxDevices": 500
-  }
-}
-```
+Click the fleet name. You land on the **Devices** tab — leave it empty for JITR fleets. Devices appear here after enrollment.
+
+<img src="/images/edge/jitr/02-fleet-devices.jpg" alt="Fleet detail page open on the Devices tab" />
+
+</Step>
+
+<Step title="Open Certificates">
+
+Select the **Certificates** tab. Active bootstrap certificates show serial, status, devices enrolled (used / quota), and expiry.
+
+<img src="/images/edge/jitr/03-certificates-tab.jpg" alt="Certificates tab listing bootstrap certificates with Issue certificate button" />
+
+</Step>
+
+<Step title="Issue a bootstrap certificate">
+
+Click **Issue certificate**. Set **Device quota** (1–1000) — how many devices this certificate may enroll. Quota is fixed once issued. Certificates are valid for **90 days**.
+
+<img src="/images/edge/jitr/04-issue-modal.jpg" alt="Issue bootstrap certificate modal with device quota field" />
+
+Click **Issue certificate** to create it.
+
+</Step>
+
+<Step title="Download the bootstrap bundle">
+
+The console shows serial, certificate ID, quota, and expiry. **Download immediately.**
+
+<img src="/images/edge/jitr/05-issued-download.jpg" alt="Bootstrap certificate issued modal with Download bootstrap bundle button" />
 
 <Warning>
-  **`keyPem` is returned exactly once and is never stored by the platform.** Save it now. If you lose it, revoke the certificate and issue a new one.
+  The private key is returned **exactly once** and is never stored by the platform. If you close without downloading, revoke the certificate and issue a new one.
 </Warning>
 
-Omit `ttl_days` — it is not yet supported and any non-zero value is rejected. Bootstrap certificates are valid for **90 days**.
+The zip contains:
+
+| File | Use |
+|------|-----|
+| `bootstrap-certificate.pem` | Flash onto every device (`bootstrap_cert_path`) |
+| `bootstrap-private.key.pem` | Keep in your provisioning system — Omega does not need it on device |
+| `bootstrap-ca.pem` | CA chain for verification |
+| `jitr-config.yaml` | Ready-to-merge `connection.jitr` block with org, project, and fleet IDs filled in |
+
+After download, the modal confirms the bundle was saved. Click **Done**.
+
+<img src="/images/edge/jitr/06-downloaded.jpg" alt="Issued modal after bundle download confirmation" />
+
+</Step>
+
+<Step title="Confirm the certificate is active">
+
+The Certificates table lists the new certificate as **active**. Use **Revoke** if a bootstrap certificate or its key ever leaks — already-enrolled devices keep working.
+
+<img src="/images/edge/jitr/07-certificates-list.jpg" alt="Certificates table with active bootstrap certificate and Revoke action" />
 
 </Step>
 
 <Step title="Place the bootstrap certificate on the device">
 
-Write `certPem` to a file in your image, for example `/etc/omega/bootstrap.crt`. The same file goes on every device in the fleet.
+Copy `bootstrap-certificate.pem` into your image, for example `/etc/omega/bootstrap.crt`. The same file goes on every device in the fleet.
 
 ```bash
-install -m 0600 bootstrap.crt /etc/omega/bootstrap.crt
+install -m 0600 bootstrap-certificate.pem /etc/omega/bootstrap.crt
 ```
 
 <Note>
-  Omega reads only the bootstrap **certificate** for the JITR call. Keep `keyPem` in your provisioning system.
+  Omega reads only the bootstrap **certificate** for the JITR call. Keep `bootstrap-private.key.pem` offline in your factory or CI secrets store.
 </Note>
 
 </Step>
 
 <Step title="Add the JITR block to your Omega profile">
 
-Add `connection.jitr` to your client YAML:
+Merge the `connection.jitr` block from `jitr-config.yaml` into your client profile (or paste the values by hand):
 
 ```yaml
 connection:
   transport: mqtt
   # server_url is overwritten by the broker URL the platform returns
-  root_topic: "/{org4}_{project4}/{device-name}"   # see step 4
+  root_topic: "/{org4}_{project4}/{device-name}"   # see next step
 
   jitr:
-    api_base_url: "https://api.ilyama.golain.io"
+    api_base_url: "https://api.ilyama.golain.io/core/api/v1"
     bootstrap_cert_path: "/etc/omega/bootstrap.crt"
     cert_dir: "/var/lib/omega/certs"
     org_id: "<org-uuid>"
     project_id: "<project-uuid>"
     fleet_id: "<fleet-uuid>"
-    device_name: "<unique-per-device>"
+    device_name_env: OMEGA_DEVICE_NAME
 ```
 
 | Field | Required | Description |
 |-------|----------|-------------|
-| `api_base_url` | Yes | Platform API root. Trailing `/` is trimmed |
+| `api_base_url` | Yes | Platform API v1 root (includes `/core/api/v1`). Trailing `/` is trimmed |
 | `bootstrap_cert_path` | Yes | Path to the fleet bootstrap certificate PEM |
 | `org_id` | Yes | Must match the bootstrap certificate's org |
 | `fleet_id` | Yes | Must match the bootstrap certificate's fleet |
-| `device_name` | Yes | Becomes the certificate `CN` and the device name. **Must be unique in the project** |
 | `project_id` | Yes | Project the device is created in |
+| `device_name` / `device_name_env` | Yes | Becomes the certificate `CN` and the device name. **Must be unique in the project** |
 | `cert_dir` | No | Where issued material is written. Defaults to `var/config/certs` |
 
 Omitting the `jitr:` block entirely disables JITR.
 
-**Per-device values via environment variables.** `device_name` differs on every unit, so set it from the environment rather than baking it into the image. Each field has a companion `*_env` key naming the variable to read:
+**Per-device values via environment variables.** `device_name` differs on every unit, so set it from the environment rather than baking it into the image:
 
 ```yaml
   jitr:
@@ -168,7 +187,7 @@ The broker authorizes devices under:
 For org `…e023` and project `…4f19` with device `press-01`, that is `/e023_4f19/press-01`. The leading slash is required.
 
 <Tip>
-  The console shows the assigned root topic on the device page. Use that value verbatim rather than assembling it by hand, and set it with `root_topic` (or `OMEGA_ROOT_TOPIC` via `root_topic_env`).
+  After the device enrolls, open it in the console and copy the assigned root topic from the device page rather than assembling it by hand. Set it with `root_topic` (or `OMEGA_ROOT_TOPIC` via `root_topic_env`).
 </Tip>
 
 </Step>
@@ -196,69 +215,17 @@ On later starts Omega **skips enrollment** if `device.crt` and `device.key` exis
 
 </Step>
 
-<Step title="Verify">
+<Step title="Verify in the console">
 
-Omega logs the assigned device id and broker URL. Confirm from the platform that the device exists and the quota was consumed:
+Omega logs the assigned device id and broker URL. In **Fleet & Devices**, open the fleet — the new device appears under **Devices**. Open it to confirm identity, MQTT details, and connectivity.
 
-```bash
-curl -sS \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "ORG-ID: $ORG_ID" \
-  "https://api.ilyama.golain.io/core/api/v1/projects/$PROJECT_ID/fleets/$FLEET_ID/bootstrap-certs"
-```
+<img src="/images/edge/jitr/08-device-detail.jpg" alt="Device detail page after JITR enrollment" />
 
-The certificate's used-device count increments by one per successful enrollment. The new device also appears in [Console → Fleets and devices](/console/fleets-and-devices).
+On the **Certificates** tab, the bootstrap certificate's **Devices enrolled** count increments by one per successful enrollment.
 
 </Step>
 
 </Steps>
-
-## What the device sends
-
-Omega issues one `POST` with a 60-second timeout. Useful when debugging with a proxy or replaying by hand:
-
-```http
-POST /core/api/v1/devices/jitr HTTP/1.1
-Host: api.ilyama.golain.io
-Content-Type: application/json
-Idempotency-Key: <32 hex chars>
-```
-
-```json
-{
-  "org_id": "…",
-  "project_id": "…",
-  "fleet_id": "…",
-  "device_name": "press-01",
-  "csr": "-----BEGIN CERTIFICATE REQUEST-----\n…",
-  "bootstrap_cert_pem": "-----BEGIN CERTIFICATE-----\n…"
-}
-```
-
-Success returns:
-
-```json
-{
-  "ok": 1,
-  "data": {
-    "device_id": "…",
-    "cert_id": "…",
-    "serial": "…",
-    "pem_cert_chain": "-----BEGIN CERTIFICATE-----\n…",
-    "mqtt_broker_url": "ssl://mqtt.ilyama.golain.io:8883"
-  }
-}
-```
-
-Omega then overwrites `connection.server_url` with `mqtt_broker_url`, `connection.device_id` with `device_id`, and points `connection.mqtt.tls.client_cert_path` / `client_key_path` at the newly written files.
-
-### Idempotency
-
-Omega sends `Idempotency-Key` as the first 16 bytes of `SHA-256("{org_id}|{fleet_id}|{device_name}")`, hex-encoded. The platform replays the cached response for **24 hours**, so a retry after a network failure returns the original certificate instead of burning another quota slot. A request still in flight returns **409 in progress**.
-
-<Note>
-  `mqtt_broker_url` is only returned if the platform's cert worker has `CERT_WORKER_MQTT_PUBLIC_URL` set. On self-hosted stacks where it is unset, the field is omitted and Omega keeps the `server_url` from your profile — so set it explicitly there.
-</Note>
 
 ## Enroll without starting the agent
 
@@ -267,7 +234,7 @@ Omega sends `Idempotency-Key` as the first 16 bytes of `SHA-256("{org_id}|{fleet
 ```bash
 cargo build --release -p omega-core --bin omega-jitr-enroll
 
-export OMEGA_E2E_API_BASE_URL=https://api.ilyama.golain.io
+export OMEGA_E2E_API_BASE_URL=https://api.ilyama.golain.io/core/api/v1
 export OMEGA_BOOTSTRAP_CERT_PATH=/etc/omega/bootstrap.crt
 export OMEGA_E2E_ORG_ID=<org-uuid>
 export OMEGA_E2E_PROJECT_ID=<project-uuid>
@@ -282,7 +249,7 @@ Output on success — exit code `0`:
 
 ```
 device_id=…
-broker_url=ssl://mqtt.ilyama.golain.io:8883
+broker_url=mqtts://mqtt.ilyama.golain.io:8883
 cert_dir=/var/lib/omega/certs
 ```
 
@@ -305,13 +272,11 @@ If a device is offline long enough for its certificate to lapse, the 24-hour re-
 
 ## Managing bootstrap certificates
 
-| Action | Call |
-|--------|------|
-| Issue | `POST /core/api/v1/projects/{project_id}/fleets/{fleet_id}/bootstrap-certs` |
-| List | `GET /core/api/v1/projects/{project_id}/fleets/{fleet_id}/bootstrap-certs` |
-| Revoke | `DELETE /core/api/v1/projects/{project_id}/fleets/{fleet_id}/bootstrap-certs/{serial}` |
-
-All three need `Authorization: Bearer` plus the `ORG-ID` header; issue and revoke additionally require `PROJECT_CAN_MANAGE_DEVICES`.
+| Action | Where |
+|--------|-------|
+| Issue | Fleet → **Certificates** → **Issue certificate** |
+| List | Fleet → **Certificates** |
+| Revoke | Fleet → **Certificates** → **Revoke** |
 
 Revoke immediately if a bootstrap certificate or its key leaks — it can enroll any device into that fleet up to its remaining quota. Revoking does not affect devices already enrolled with it.
 
@@ -319,7 +284,7 @@ Revoke immediately if a bootstrap certificate or its key leaks — it can enroll
 
 | Symptom | Cause | Fix |
 |---------|-------|-----|
-| `400 invalid bootstrap_cert_pem` | File is not a PEM certificate, or is the key rather than the cert | Point `bootstrap_cert_path` at `certPem` |
+| `400 invalid bootstrap_cert_pem` | File is not a PEM certificate, or is the key rather than the cert | Point `bootstrap_cert_path` at `bootstrap-certificate.pem` |
 | `400 bootstrap cert not signed by this CA` | Certificate came from a different stack | Reissue against the stack in `api_base_url` |
 | `400 bootstrap cert is outside its validity window` | Past 90 days, or device clock is wrong | Reissue, or fix device time (NTP) |
 | `400 bootstrap cert not found` | Serial not in the registry | Reissue |
@@ -334,7 +299,7 @@ Revoke immediately if a bootstrap certificate or its key leaks — it can enroll
 | Enrollment failure stops the agent | There is no retry or backoff — one attempt, then exit | Supervise with systemd `Restart=on-failure` |
 
 <Note>
-  Enrollment failures are fatal to startup by design: a single `POST`, no retry loop. Run Omega under a supervisor so transient API outages are retried by process restart.
+  Enrollment failures are fatal to startup by design: a single request, no retry loop. Run Omega under a supervisor so transient API outages are retried by process restart.
 </Note>
 
 ## Next steps

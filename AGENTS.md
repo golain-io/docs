@@ -83,7 +83,7 @@ When upstream changes, update the corresponding Mintlify page and cross-links.
 
 ## Open items (known gaps)
 
-- Console walkthroughs need screenshots from `pw` and production
+- Console walkthroughs need screenshots from `pw` and production (JITR bootstrap cert flow: `/images/edge/jitr/`)
 - golain-cli install section needs release artifact URLs when published
 - API reference tab not yet wired to `ilyama` OpenAPI — add when public API docs are scoped
 
