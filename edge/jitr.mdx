@@ -131,8 +131,11 @@ Merge the `connection.jitr` block from `jitr-config.yaml` into your client profi
 ```yaml
 connection:
   transport: mqtt
-  # server_url is overwritten by the broker URL the platform returns
-  root_topic: "/{org4}_{project4}/{device-name}"   # see next step
+  # Filled by JITR after enrollment
+  server_url: ""
+  device_id: ""
+  # Omega resolves {{ OMEGA_DEVICE_NAME }} before parse (same name used for JITR)
+  root_topic: "/e023_4f19/{{ OMEGA_DEVICE_NAME }}"
 
   jitr:
     api_base_url: "https://api.ilyama.golain.io/core/api/v1"
@@ -143,6 +146,8 @@ connection:
     fleet_id: "<fleet-uuid>"
     device_name_env: OMEGA_DEVICE_NAME
 ```
+
+The downloaded `jitr-config.yaml` already bakes the `/{org4}_{project4}/` prefixes for your fleet. You only need to export a unique `OMEGA_DEVICE_NAME` per device.
 
 | Field | Required | Description |
 |-------|----------|-------------|
@@ -172,22 +177,14 @@ The environment value wins when the named variable is set and non-empty; otherwi
 
 </Step>
 
-<Step title="Set the root topic">
+<Step title="Confirm the root topic">
 
-This is the most common cause of a "successful" enrollment that then goes silent.
+The bootstrap bundle sets `root_topic` to `/{org4}_{project4}/{{ OMEGA_DEVICE_NAME }}` for your fleet. With `OMEGA_DEVICE_NAME=press-01` that becomes `/e023_4f19/press-01` — the path the broker ACL allows.
 
-After enrollment Omega defaults `root_topic` to `omega/{device_id}` if you left it empty — and that topic is **denied by the broker ACL**. mTLS connects fine, then every subscribe fails and the broker disconnects on the first publish.
-
-The broker authorizes devices under:
-
-```
-/{org-uuid-last4}_{project-uuid-last4}/{device-name}/...
-```
-
-For org `…e023` and project `…4f19` with device `press-01`, that is `/e023_4f19/press-01`. The leading slash is required.
+If you leave `root_topic` empty, Omega defaults to `omega/{device_id}`, which the broker **denies**. mTLS connects, then every subscribe fails.
 
 <Tip>
-  After the device enrolls, open it in the console and copy the assigned root topic from the device page rather than assembling it by hand. Set it with `root_topic` (or `OMEGA_ROOT_TOPIC` via `root_topic_env`).
+  After enrollment, open the device in the console and confirm the assigned root topic matches what Omega is using.
 </Tip>
 
 </Step>
